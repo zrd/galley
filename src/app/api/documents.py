@@ -27,6 +27,20 @@ def create_document(doc_in: DocumentCreate, owner_id: UUID = Depends(get_current
     )
 
 
+@router.patch("/", response_model=DocumentRead, dependencies=[Depends(get_current_user_id)])
+def update_document(doc_in: DocumentUpdate, owner_id: UUID = Depends(get_current_user_id)):
+    doc = service.update(doc_in)
+    return DocumentRead(
+        document_id=doc.document_id,
+        owner_id=doc.owner_id,
+        title=doc.title,
+        content=doc.content,
+        state=doc.state,
+        created_at=doc.created_at,
+        updated_at=doc.updated_at,
+    )
+
+
 @router.get("/", response_model=List[DocumentRead], dependencies=[Depends(get_current_user_id)])
 def list_documents(owner_id: UUID = Depends(get_current_user_id)):
     docs = service.list(owner_id)

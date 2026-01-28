@@ -1,3 +1,4 @@
+from typing import Optional
 from uuid import UUID
 from datetime import datetime
 from pydantic import BaseModel
@@ -10,8 +11,8 @@ class DocumentCreate(BaseModel):
 
 
 class DocumentUpdate(BaseModel):
-    title: str
-    content: str
+    title: Optional[str] = None
+    content: Optional[bytes] = None
 
 
 class DocumentRead(BaseModel):
