@@ -1,9 +1,15 @@
-from fastapi import APIRouter, Depends
-from uuid import UUID
-from app.security.auth import get_current_user_id
+"""
+Debug endpoints - only available in dev environment.
+"""
+
+from fastapi import APIRouter
+
+from app.security.auth import CurrentAuthorId
 
 router = APIRouter()
 
+
 @router.get("/whoami")
-def whoami(user_id: UUID = Depends(get_current_user_id)):
-    return {"user_id": user_id}
+def whoami(author_id: CurrentAuthorId) -> dict:
+    """Return the current authenticated author's ID."""
+    return {"author_id": str(author_id)}

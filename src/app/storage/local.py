@@ -1,0 +1,107 @@
+"""
+Local filesystem storage backend for development and testing.
+
+This implementation stores files on the local filesystem, mimicking
+the interface of cloud storage services like S3.
+"""
+
+import os
+from pathlib import Path
+
+import aiofiles
+import aiofiles.os
+
+
+class LocalStorageBackend:
+    """Local filesystem storage backend."""
+
+    def __init__(self, base_path: str | Path) -> None:
+        """
+        Initialize the local storage backend.
+
+        Args:
+            base_path: The base directory for storing files
+        """
+        self.base_path = Path(base_path)
+        self.base_path.mkdir(parents=True, exist_ok=True)
+
+    def _get_full_path(self, key: str) -> Path:
+        """Get the full filesystem path for a storage key."""
+        # Normalize the key to prevent directory traversal
+        safe_key = key.lstrip("/").replace("..", "")
+        return self.base_path / safe_key
+
+    async def upload(
+        self, key: str, data: bytes, content_type: str = "application/octet-stream"
+    ) -> str:
+        """Upload a file to local storage."""
+        full_path = self._get_full_path(key)
+
+        # Create parent directories if needed
+        full_path.parent.mkdir(parents=True, exist_ok=True)
+
+        async with aiofiles.open(full_path, "wb") as f:
+            await f.write(data)
+
+        # Store content type in a sidecar file (useful for serving)
+        meta_path = full_path.with_suffix(full_path.suffix + ".meta")
+        async with aiofiles.open(meta_path, "w") as f:
+            await f.write(content_type)
+
+        return key
+
+    async def download(self, key: str) -> bytes:
+        """Download a file from local storage."""
+        full_path = self._get_full_path(key)
+
+        if not full_path.exists():
+            raise FileNotFoundError(f"File not found: {key}")
+
+        async with aiofiles.open(full_path, "rb") as f:
+            return await f.read()
+
+    async def delete(self, key: str) -> None:
+        """Delete a file from local storage."""
+        full_path = self._get_full_path(key)
+
+        if full_path.exists():
+            await aiofiles.os.remove(full_path)
+
+        # Also remove metadata file if it exists
+        meta_path = full_path.with_suffix(full_path.suffix + ".meta")
+        if meta_path.exists():
+            await aiofiles.os.remove(meta_path)
+
+    async def exists(self, key: str) -> bool:
+        """Check if a file exists in local storage."""
+        full_path = self._get_full_path(key)
+        return full_path.exists()
+
+    async def get_size(self, key: str) -> int:
+        """Get the size of a file in bytes."""
+        full_path = self._get_full_path(key)
+
+        if not full_path.exists():
+            raise FileNotFoundError(f"File not found: {key}")
+
+        stat = await aiofiles.os.stat(full_path)
+        return stat.st_size
+
+    async def get_content_type(self, key: str) -> str:
+        """Get the content type of a stored file."""
+        full_path = self._get_full_path(key)
+        meta_path = full_path.with_suffix(full_path.suffix + ".meta")
+
+        if meta_path.exists():
+            async with aiofiles.open(meta_path, "r") as f:
+                return await f.read()
+
+        # Default content type based on extension
+        ext = full_path.suffix.lower()
+        content_types = {
+            ".epub": "application/epub+zip",
+            ".pdf": "application/pdf",
+            ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            ".odt": "application/vnd.oasis.opendocument.text",
+        }
+        return content_types.get(ext, "application/octet-stream")
