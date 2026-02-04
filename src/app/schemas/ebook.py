@@ -1,13 +1,13 @@
 from datetime import datetime
 from uuid import UUID
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from app.domain import OutputFormat
 
 
 class EbookGenerateRequest(BaseModel):
-    output_formats: list[OutputFormat]
+    output_formats: list[OutputFormat] = Field(min_length=1)
 
 
 class EbookRead(BaseModel):

@@ -43,7 +43,7 @@ def get_ebook_service(db: Annotated[Session, Depends(get_db)]) -> EbookService:
 @router.post("/", response_model=ManuscriptRead, status_code=status.HTTP_201_CREATED)
 async def create_manuscript(
     author_id: CurrentAuthorId,
-    title: Annotated[str, Form()],
+    title: Annotated[str, Form(min_length=1)],
     source_format: Annotated[SourceFormat, Form()],
     file: Annotated[UploadFile, File()],
     description: Annotated[str | None, Form()] = None,
@@ -59,6 +59,13 @@ async def create_manuscript(
     - DOCX (.docx)
     - ODT (.odt)
     """
+    # Validate title is not whitespace only
+    if not title.strip():
+        raise HTTPException(
+            status_code=422,
+            detail=[{"loc": ["body", "title"], "msg": "title cannot be whitespace only", "type": "value_error"}],
+        )
+
     # Read file contents
     content = await file.read()
     if len(content) == 0:
