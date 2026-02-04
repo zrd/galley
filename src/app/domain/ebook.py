@@ -22,6 +22,17 @@ class Ebook:
     sample_id: UUID | None = None
     download_count: int = 0
     created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    deleted_at: datetime | None = None
+
+    @property
+    def is_deleted(self) -> bool:
+        return self.deleted_at is not None
+
+    def soft_delete(self) -> None:
+        self.deleted_at = datetime.now(timezone.utc)
+
+    def restore(self) -> None:
+        self.deleted_at = None
 
     def increment_download_count(self) -> None:
         """Increment the download counter."""

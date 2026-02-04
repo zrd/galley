@@ -2,6 +2,7 @@
 SQLAlchemy repository implementations for production use with PostgreSQL.
 """
 
+from datetime import datetime, timezone
 from uuid import UUID
 
 from sqlalchemy.orm import Session
@@ -23,6 +24,7 @@ def _author_model_to_domain(model: AuthorModel) -> Author:
         password_hash=model.password_hash,
         display_name=model.display_name,
         created_at=model.created_at,
+        deleted_at=model.deleted_at,
     )
 
 
@@ -37,6 +39,7 @@ def _manuscript_model_to_domain(model: ManuscriptModel) -> Manuscript:
         state=model.state,
         created_at=model.created_at,
         updated_at=model.updated_at,
+        deleted_at=model.deleted_at,
     )
 
 
@@ -51,6 +54,7 @@ def _sample_model_to_domain(model: SampleModel) -> Sample:
         promo_footer=model.promo_footer,
         created_at=model.created_at,
         updated_at=model.updated_at,
+        deleted_at=model.deleted_at,
     )
 
 
@@ -64,6 +68,7 @@ def _ebook_model_to_domain(model: EbookModel) -> Ebook:
         file_size_bytes=model.file_size_bytes,
         download_count=model.download_count,
         created_at=model.created_at,
+        deleted_at=model.deleted_at,
     )
 
 
@@ -74,6 +79,7 @@ def _download_model_to_domain(model: DownloadModel) -> Download:
         downloaded_at=model.downloaded_at,
         ip_hash=model.ip_hash,
         tracking_code=model.tracking_code,
+        deleted_at=model.deleted_at,
     )
 
 
@@ -88,17 +94,25 @@ class SQLAlchemyAuthorRepository:
             password_hash=author.password_hash,
             display_name=author.display_name,
             created_at=author.created_at,
+            deleted_at=author.deleted_at,
         )
         self.session.add(model)
         self.session.flush()
         return _author_model_to_domain(model)
 
-    def get(self, author_id: UUID) -> Author | None:
+    def get(self, author_id: UUID, *, include_deleted: bool = False) -> Author | None:
         model = self.session.get(AuthorModel, author_id)
-        return _author_model_to_domain(model) if model else None
+        if model is None:
+            return None
+        if not include_deleted and model.deleted_at is not None:
+            return None
+        return _author_model_to_domain(model)
 
-    def get_by_email(self, email: str) -> Author | None:
-        model = self.session.query(AuthorModel).filter(AuthorModel.email == email).first()
+    def get_by_email(self, email: str, *, include_deleted: bool = False) -> Author | None:
+        query = self.session.query(AuthorModel).filter(AuthorModel.email == email)
+        if not include_deleted:
+            query = query.filter(AuthorModel.deleted_at.is_(None))
+        model = query.first()
         return _author_model_to_domain(model) if model else None
 
     def update(self, author: Author) -> Author:
@@ -107,6 +121,7 @@ class SQLAlchemyAuthorRepository:
             model.email = author.email
             model.display_name = author.display_name
             model.password_hash = author.password_hash
+            model.deleted_at = author.deleted_at
             self.session.flush()
             return _author_model_to_domain(model)
         raise ValueError(f"Author {author.id} not found")
@@ -115,6 +130,18 @@ class SQLAlchemyAuthorRepository:
         model = self.session.get(AuthorModel, author_id)
         if model:
             self.session.delete(model)
+            self.session.flush()
+
+    def soft_delete(self, author_id: UUID) -> None:
+        model = self.session.get(AuthorModel, author_id)
+        if model:
+            model.deleted_at = datetime.now(timezone.utc)
+            self.session.flush()
+
+    def restore(self, author_id: UUID) -> None:
+        model = self.session.get(AuthorModel, author_id)
+        if model:
+            model.deleted_at = None
             self.session.flush()
 
 
@@ -133,22 +160,28 @@ class SQLAlchemyManuscriptRepository:
             state=manuscript.state,
             created_at=manuscript.created_at,
             updated_at=manuscript.updated_at,
+            deleted_at=manuscript.deleted_at,
         )
         self.session.add(model)
         self.session.flush()
         return _manuscript_model_to_domain(model)
 
-    def get(self, manuscript_id: UUID) -> Manuscript | None:
+    def get(self, manuscript_id: UUID, *, include_deleted: bool = False) -> Manuscript | None:
         model = self.session.get(ManuscriptModel, manuscript_id)
-        return _manuscript_model_to_domain(model) if model else None
+        if model is None:
+            return None
+        if not include_deleted and model.deleted_at is not None:
+            return None
+        return _manuscript_model_to_domain(model)
 
-    def list_by_author(self, author_id: UUID) -> list[Manuscript]:
-        models = (
+    def list_by_author(self, author_id: UUID, *, include_deleted: bool = False) -> list[Manuscript]:
+        query = (
             self.session.query(ManuscriptModel)
             .filter(ManuscriptModel.author_id == author_id)
-            .order_by(ManuscriptModel.updated_at.desc())
-            .all()
         )
+        if not include_deleted:
+            query = query.filter(ManuscriptModel.deleted_at.is_(None))
+        models = query.order_by(ManuscriptModel.updated_at.desc()).all()
         return [_manuscript_model_to_domain(m) for m in models]
 
     def update(self, manuscript: Manuscript) -> Manuscript:
@@ -160,6 +193,7 @@ class SQLAlchemyManuscriptRepository:
             model.source_file_key = manuscript.source_file_key
             model.state = manuscript.state
             model.updated_at = manuscript.updated_at
+            model.deleted_at = manuscript.deleted_at
             self.session.flush()
             return _manuscript_model_to_domain(model)
         raise ValueError(f"Manuscript {manuscript.id} not found")
@@ -168,6 +202,18 @@ class SQLAlchemyManuscriptRepository:
         model = self.session.get(ManuscriptModel, manuscript_id)
         if model:
             self.session.delete(model)
+            self.session.flush()
+
+    def soft_delete(self, manuscript_id: UUID) -> None:
+        model = self.session.get(ManuscriptModel, manuscript_id)
+        if model:
+            model.deleted_at = datetime.now(timezone.utc)
+            self.session.flush()
+
+    def restore(self, manuscript_id: UUID) -> None:
+        model = self.session.get(ManuscriptModel, manuscript_id)
+        if model:
+            model.deleted_at = None
             self.session.flush()
 
 
@@ -186,22 +232,28 @@ class SQLAlchemySampleRepository:
             promo_footer=sample.promo_footer,
             created_at=sample.created_at,
             updated_at=sample.updated_at,
+            deleted_at=sample.deleted_at,
         )
         self.session.add(model)
         self.session.flush()
         return _sample_model_to_domain(model)
 
-    def get(self, sample_id: UUID) -> Sample | None:
+    def get(self, sample_id: UUID, *, include_deleted: bool = False) -> Sample | None:
         model = self.session.get(SampleModel, sample_id)
-        return _sample_model_to_domain(model) if model else None
+        if model is None:
+            return None
+        if not include_deleted and model.deleted_at is not None:
+            return None
+        return _sample_model_to_domain(model)
 
-    def list_by_manuscript(self, manuscript_id: UUID) -> list[Sample]:
-        models = (
+    def list_by_manuscript(self, manuscript_id: UUID, *, include_deleted: bool = False) -> list[Sample]:
+        query = (
             self.session.query(SampleModel)
             .filter(SampleModel.manuscript_id == manuscript_id)
-            .order_by(SampleModel.created_at.desc())
-            .all()
         )
+        if not include_deleted:
+            query = query.filter(SampleModel.deleted_at.is_(None))
+        models = query.order_by(SampleModel.created_at.desc()).all()
         return [_sample_model_to_domain(m) for m in models]
 
     def update(self, sample: Sample) -> Sample:
@@ -213,6 +265,7 @@ class SQLAlchemySampleRepository:
             model.promo_header = sample.promo_header
             model.promo_footer = sample.promo_footer
             model.updated_at = sample.updated_at
+            model.deleted_at = sample.deleted_at
             self.session.flush()
             return _sample_model_to_domain(model)
         raise ValueError(f"Sample {sample.id} not found")
@@ -222,6 +275,33 @@ class SQLAlchemySampleRepository:
         if model:
             self.session.delete(model)
             self.session.flush()
+
+    def soft_delete(self, sample_id: UUID) -> None:
+        model = self.session.get(SampleModel, sample_id)
+        if model:
+            model.deleted_at = datetime.now(timezone.utc)
+            self.session.flush()
+
+    def soft_delete_by_manuscript(self, manuscript_id: UUID) -> None:
+        now = datetime.now(timezone.utc)
+        self.session.query(SampleModel).filter(
+            SampleModel.manuscript_id == manuscript_id,
+            SampleModel.deleted_at.is_(None),
+        ).update({"deleted_at": now})
+        self.session.flush()
+
+    def restore(self, sample_id: UUID) -> None:
+        model = self.session.get(SampleModel, sample_id)
+        if model:
+            model.deleted_at = None
+            self.session.flush()
+
+    def restore_by_manuscript(self, manuscript_id: UUID) -> None:
+        self.session.query(SampleModel).filter(
+            SampleModel.manuscript_id == manuscript_id,
+            SampleModel.deleted_at.is_not(None),
+        ).update({"deleted_at": None})
+        self.session.flush()
 
 
 class SQLAlchemyEbookRepository:
@@ -238,38 +318,56 @@ class SQLAlchemyEbookRepository:
             file_size_bytes=ebook.file_size_bytes,
             download_count=ebook.download_count,
             created_at=ebook.created_at,
+            deleted_at=ebook.deleted_at,
         )
         self.session.add(model)
         self.session.flush()
         return _ebook_model_to_domain(model)
 
-    def get(self, ebook_id: UUID) -> Ebook | None:
+    def get(self, ebook_id: UUID, *, include_deleted: bool = False) -> Ebook | None:
         model = self.session.get(EbookModel, ebook_id)
-        return _ebook_model_to_domain(model) if model else None
+        if model is None:
+            return None
+        if not include_deleted and model.deleted_at is not None:
+            return None
+        return _ebook_model_to_domain(model)
 
-    def list_by_manuscript(self, manuscript_id: UUID) -> list[Ebook]:
-        models = (
+    def list_by_manuscript(self, manuscript_id: UUID, *, include_deleted: bool = False) -> list[Ebook]:
+        query = (
             self.session.query(EbookModel)
             .filter(EbookModel.manuscript_id == manuscript_id)
-            .order_by(EbookModel.created_at.desc())
-            .all()
         )
+        if not include_deleted:
+            query = query.filter(EbookModel.deleted_at.is_(None))
+        models = query.order_by(EbookModel.created_at.desc()).all()
         return [_ebook_model_to_domain(m) for m in models]
 
-    def list_by_author(self, author_id: UUID) -> list[Ebook]:
-        models = (
+    def list_by_author(self, author_id: UUID, *, include_deleted: bool = False) -> list[Ebook]:
+        query = (
             self.session.query(EbookModel)
             .join(ManuscriptModel)
             .filter(ManuscriptModel.author_id == author_id)
-            .order_by(EbookModel.created_at.desc())
-            .all()
         )
+        if not include_deleted:
+            query = query.filter(EbookModel.deleted_at.is_(None))
+        models = query.order_by(EbookModel.created_at.desc()).all()
+        return [_ebook_model_to_domain(m) for m in models]
+
+    def list_by_sample(self, sample_id: UUID, *, include_deleted: bool = False) -> list[Ebook]:
+        query = (
+            self.session.query(EbookModel)
+            .filter(EbookModel.sample_id == sample_id)
+        )
+        if not include_deleted:
+            query = query.filter(EbookModel.deleted_at.is_(None))
+        models = query.order_by(EbookModel.created_at.desc()).all()
         return [_ebook_model_to_domain(m) for m in models]
 
     def update(self, ebook: Ebook) -> Ebook:
         model = self.session.get(EbookModel, ebook.id)
         if model:
             model.download_count = ebook.download_count
+            model.deleted_at = ebook.deleted_at
             self.session.flush()
             return _ebook_model_to_domain(model)
         raise ValueError(f"Ebook {ebook.id} not found")
@@ -286,6 +384,48 @@ class SQLAlchemyEbookRepository:
         ).delete()
         self.session.flush()
 
+    def soft_delete(self, ebook_id: UUID) -> None:
+        model = self.session.get(EbookModel, ebook_id)
+        if model:
+            model.deleted_at = datetime.now(timezone.utc)
+            self.session.flush()
+
+    def soft_delete_by_manuscript(self, manuscript_id: UUID) -> None:
+        now = datetime.now(timezone.utc)
+        self.session.query(EbookModel).filter(
+            EbookModel.manuscript_id == manuscript_id,
+            EbookModel.deleted_at.is_(None),
+        ).update({"deleted_at": now})
+        self.session.flush()
+
+    def soft_delete_by_sample(self, sample_id: UUID) -> None:
+        now = datetime.now(timezone.utc)
+        self.session.query(EbookModel).filter(
+            EbookModel.sample_id == sample_id,
+            EbookModel.deleted_at.is_(None),
+        ).update({"deleted_at": now})
+        self.session.flush()
+
+    def restore(self, ebook_id: UUID) -> None:
+        model = self.session.get(EbookModel, ebook_id)
+        if model:
+            model.deleted_at = None
+            self.session.flush()
+
+    def restore_by_manuscript(self, manuscript_id: UUID) -> None:
+        self.session.query(EbookModel).filter(
+            EbookModel.manuscript_id == manuscript_id,
+            EbookModel.deleted_at.is_not(None),
+        ).update({"deleted_at": None})
+        self.session.flush()
+
+    def restore_by_sample(self, sample_id: UUID) -> None:
+        self.session.query(EbookModel).filter(
+            EbookModel.sample_id == sample_id,
+            EbookModel.deleted_at.is_not(None),
+        ).update({"deleted_at": None})
+        self.session.flush()
+
 
 class SQLAlchemyDownloadRepository:
     def __init__(self, session: Session) -> None:
@@ -298,27 +438,35 @@ class SQLAlchemyDownloadRepository:
             downloaded_at=download.downloaded_at,
             ip_hash=download.ip_hash,
             tracking_code=download.tracking_code,
+            deleted_at=download.deleted_at,
         )
         self.session.add(model)
         self.session.flush()
         return _download_model_to_domain(model)
 
-    def get(self, download_id: UUID) -> Download | None:
+    def get(self, download_id: UUID, *, include_deleted: bool = False) -> Download | None:
         model = self.session.get(DownloadModel, download_id)
-        return _download_model_to_domain(model) if model else None
+        if model is None:
+            return None
+        if not include_deleted and model.deleted_at is not None:
+            return None
+        return _download_model_to_domain(model)
 
-    def list_by_ebook(self, ebook_id: UUID) -> list[Download]:
-        models = (
+    def list_by_ebook(self, ebook_id: UUID, *, include_deleted: bool = False) -> list[Download]:
+        query = (
             self.session.query(DownloadModel)
             .filter(DownloadModel.ebook_id == ebook_id)
-            .order_by(DownloadModel.downloaded_at.desc())
-            .all()
         )
+        if not include_deleted:
+            query = query.filter(DownloadModel.deleted_at.is_(None))
+        models = query.order_by(DownloadModel.downloaded_at.desc()).all()
         return [_download_model_to_domain(m) for m in models]
 
-    def count_by_ebook(self, ebook_id: UUID) -> int:
-        return (
+    def count_by_ebook(self, ebook_id: UUID, *, include_deleted: bool = False) -> int:
+        query = (
             self.session.query(DownloadModel)
             .filter(DownloadModel.ebook_id == ebook_id)
-            .count()
         )
+        if not include_deleted:
+            query = query.filter(DownloadModel.deleted_at.is_(None))
+        return query.count()

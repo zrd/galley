@@ -22,6 +22,9 @@ class AuthorModel(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
     )
+    deleted_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True, default=None, index=True
+    )
 
     # Relationships
     manuscripts: Mapped[list["ManuscriptModel"]] = relationship(
@@ -57,6 +60,9 @@ class ManuscriptModel(Base):
         DateTime(timezone=True),
         default=lambda: datetime.now(timezone.utc),
         onupdate=lambda: datetime.now(timezone.utc),
+    )
+    deleted_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True, default=None, index=True
     )
 
     # Relationships
@@ -94,6 +100,9 @@ class SampleModel(Base):
         default=lambda: datetime.now(timezone.utc),
         onupdate=lambda: datetime.now(timezone.utc),
     )
+    deleted_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True, default=None, index=True
+    )
 
     # Relationships
     manuscript: Mapped["ManuscriptModel"] = relationship(back_populates="samples")
@@ -130,6 +139,9 @@ class EbookModel(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
     )
+    deleted_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True, default=None, index=True
+    )
 
     # Relationships
     manuscript: Mapped["ManuscriptModel"] = relationship(back_populates="ebooks")
@@ -156,6 +168,9 @@ class DownloadModel(Base):
     )
     ip_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
     tracking_code: Mapped[str | None] = mapped_column(String(100), nullable=True, index=True)
+    deleted_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True, default=None
+    )
 
     # Relationships
     ebook: Mapped["EbookModel"] = relationship(back_populates="downloads")

@@ -482,3 +482,118 @@ class TestInputValidation:
         )
 
         assert response.status_code == 422
+
+
+class TestEbookSoftDelete:
+    """Tests for ebook soft delete and restore functionality."""
+
+    def test_delete_is_soft_delete(
+        self, client: TestClient, auth_headers: dict, ready_manuscript_id: str
+    ):
+        """Deleting an ebook should be a soft delete."""
+        # Generate ebook
+        generate_response = client.post(
+            f"/ebooks/manuscripts/{ready_manuscript_id}/generate",
+            headers=auth_headers,
+            json={"output_formats": ["epub"]},
+        )
+        ebook_id = generate_response.json()[0]["id"]
+
+        # Delete it
+        delete_response = client.delete(f"/ebooks/{ebook_id}", headers=auth_headers)
+        assert delete_response.status_code == 204
+
+        # Should not appear in normal list
+        list_response = client.get("/ebooks/", headers=auth_headers)
+        assert all(e["id"] != ebook_id for e in list_response.json())
+
+        # Should appear in list with include_deleted=true
+        list_deleted_response = client.get(
+            "/ebooks/?include_deleted=true", headers=auth_headers
+        )
+        deleted_ebooks = [e for e in list_deleted_response.json() if e["id"] == ebook_id]
+        assert len(deleted_ebooks) == 1
+        assert deleted_ebooks[0]["deleted_at"] is not None
+
+    def test_download_deleted_ebook_fails(
+        self, client: TestClient, auth_headers: dict, ready_manuscript_id: str
+    ):
+        """Cannot download a soft-deleted ebook."""
+        # Generate ebook
+        generate_response = client.post(
+            f"/ebooks/manuscripts/{ready_manuscript_id}/generate",
+            headers=auth_headers,
+            json={"output_formats": ["epub"]},
+        )
+        ebook_id = generate_response.json()[0]["id"]
+
+        # Delete it
+        client.delete(f"/ebooks/{ebook_id}", headers=auth_headers)
+
+        # Download should fail
+        download_response = client.get(f"/ebooks/{ebook_id}/download")
+        assert download_response.status_code == 404
+
+    def test_restore_ebook(
+        self, client: TestClient, auth_headers: dict, ready_manuscript_id: str
+    ):
+        """Restoring a soft-deleted ebook should make it downloadable again."""
+        # Generate ebook
+        generate_response = client.post(
+            f"/ebooks/manuscripts/{ready_manuscript_id}/generate",
+            headers=auth_headers,
+            json={"output_formats": ["epub"]},
+        )
+        ebook_id = generate_response.json()[0]["id"]
+
+        # Delete it
+        client.delete(f"/ebooks/{ebook_id}", headers=auth_headers)
+
+        # Restore it
+        restore_response = client.post(
+            f"/ebooks/{ebook_id}/restore", headers=auth_headers
+        )
+        assert restore_response.status_code == 200
+        assert restore_response.json()["id"] == ebook_id
+
+        # Should now appear in normal list
+        list_response = client.get("/ebooks/", headers=auth_headers)
+        assert any(e["id"] == ebook_id for e in list_response.json())
+
+        # Download should work again
+        download_response = client.get(f"/ebooks/{ebook_id}/download")
+        assert download_response.status_code == 200
+
+    def test_restore_ebook_wrong_owner(
+        self, client: TestClient, auth_headers: dict, ready_manuscript_id: str
+    ):
+        """Cannot restore another user's soft-deleted ebook."""
+        import uuid
+
+        # Generate ebook
+        generate_response = client.post(
+            f"/ebooks/manuscripts/{ready_manuscript_id}/generate",
+            headers=auth_headers,
+            json={"output_formats": ["epub"]},
+        )
+        ebook_id = generate_response.json()[0]["id"]
+
+        # Delete it
+        client.delete(f"/ebooks/{ebook_id}", headers=auth_headers)
+
+        # Register second user
+        response2 = client.post(
+            "/auth/register",
+            json={
+                "email": f"attacker-restore-{uuid.uuid4()}@example.com",
+                "password": "password",
+                "display_name": "Attacker",
+            },
+        )
+        attacker_headers = {"Authorization": f"Bearer {response2.json()['access_token']}"}
+
+        # Try to restore as second user
+        restore_response = client.post(
+            f"/ebooks/{ebook_id}/restore", headers=attacker_headers
+        )
+        assert restore_response.status_code == 404

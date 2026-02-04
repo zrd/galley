@@ -7,7 +7,7 @@ Samples define how to create promotional excerpts from manuscripts.
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from app.db import get_db
@@ -31,13 +31,16 @@ router = APIRouter()
 
 
 def get_manuscript_service(db: Annotated[Session, Depends(get_db)]) -> ManuscriptService:
-    repo = SQLAlchemyManuscriptRepository(db)
-    return ManuscriptService(repo)
+    manuscript_repo = SQLAlchemyManuscriptRepository(db)
+    sample_repo = SQLAlchemySampleRepository(db)
+    ebook_repo = SQLAlchemyEbookRepository(db)
+    return ManuscriptService(manuscript_repo, sample_repo, ebook_repo)
 
 
 def get_sample_service(db: Annotated[Session, Depends(get_db)]) -> SampleService:
     repo = SQLAlchemySampleRepository(db)
-    return SampleService(repo)
+    ebook_repo = SQLAlchemyEbookRepository(db)
+    return SampleService(repo, ebook_repo)
 
 
 def get_ebook_service(db: Annotated[Session, Depends(get_db)]) -> EbookService:
@@ -102,6 +105,7 @@ def list_samples(
     author_id: CurrentAuthorId,
     manuscript_service: Annotated[ManuscriptService, Depends(get_manuscript_service)],
     sample_service: Annotated[SampleService, Depends(get_sample_service)],
+    include_deleted: Annotated[bool, Query()] = False,
 ) -> list[SampleRead]:
     """List all samples for a manuscript."""
     try:
@@ -109,10 +113,10 @@ def list_samples(
     except ValueError:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Manuscript not found")
 
-    if not manuscript_service.check_ownership(mid, author_id):
+    if not manuscript_service.check_ownership(mid, author_id, include_deleted=include_deleted):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Manuscript not found")
 
-    samples = sample_service.list_by_manuscript(mid)
+    samples = sample_service.list_by_manuscript(mid, include_deleted=include_deleted)
     return [
         SampleRead(
             id=s.id,
@@ -124,6 +128,7 @@ def list_samples(
             promo_footer=s.promo_footer,
             created_at=s.created_at,
             updated_at=s.updated_at,
+            deleted_at=s.deleted_at,
         )
         for s in samples
     ]
@@ -218,7 +223,7 @@ def delete_sample(
     sample_service: Annotated[SampleService, Depends(get_sample_service)],
     db: Annotated[Session, Depends(get_db)],
 ) -> None:
-    """Delete a sample definition."""
+    """Soft delete a sample definition and its generated ebooks."""
     try:
         sid = UUID(sample_id)
     except ValueError:
@@ -232,8 +237,47 @@ def delete_sample(
     if not manuscript_service.check_ownership(sample.manuscript_id, author_id):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Sample not found")
 
-    sample_service.delete(sid)
+    sample_service.soft_delete(sid)
     db.commit()
+
+
+@router.post("/{sample_id}/restore", response_model=SampleRead)
+def restore_sample(
+    sample_id: str,
+    author_id: CurrentAuthorId,
+    manuscript_service: Annotated[ManuscriptService, Depends(get_manuscript_service)],
+    sample_service: Annotated[SampleService, Depends(get_sample_service)],
+    db: Annotated[Session, Depends(get_db)],
+) -> SampleRead:
+    """Restore a soft-deleted sample and its generated ebooks."""
+    try:
+        sid = UUID(sample_id)
+    except ValueError:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Sample not found")
+
+    try:
+        sample = sample_service.get(sid, include_deleted=True)
+    except SampleNotFound:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Sample not found")
+
+    if not manuscript_service.check_ownership(sample.manuscript_id, author_id, include_deleted=True):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Sample not found")
+
+    sample_service.restore(sid)
+    db.commit()
+
+    sample = sample_service.get(sid)
+    return SampleRead(
+        id=sample.id,
+        manuscript_id=sample.manuscript_id,
+        title=sample.title,
+        excerpt_start=sample.excerpt_start,
+        excerpt_end=sample.excerpt_end,
+        promo_header=sample.promo_header,
+        promo_footer=sample.promo_footer,
+        created_at=sample.created_at,
+        updated_at=sample.updated_at,
+    )
 
 
 @router.post("/{sample_id}/generate", response_model=list[EbookRead])

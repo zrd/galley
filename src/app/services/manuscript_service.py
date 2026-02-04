@@ -1,12 +1,19 @@
 from uuid import UUID
 
-from app.domain import Manuscript, ManuscriptNotFound, ManuscriptState, SourceFormat
-from app.repositories import InMemoryManuscriptRepository
+from app.domain import Manuscript, ManuscriptNotFound, SourceFormat
+from app.repositories.protocols import EbookRepository, ManuscriptRepository, SampleRepository
 
 
 class ManuscriptService:
-    def __init__(self, repo: InMemoryManuscriptRepository) -> None:
+    def __init__(
+        self,
+        repo: ManuscriptRepository,
+        sample_repo: SampleRepository | None = None,
+        ebook_repo: EbookRepository | None = None,
+    ) -> None:
         self.repo = repo
+        self.sample_repo = sample_repo
+        self.ebook_repo = ebook_repo
 
     def create(
         self,
@@ -25,14 +32,14 @@ class ManuscriptService:
         )
         return self.repo.add(manuscript)
 
-    def get(self, manuscript_id: UUID) -> Manuscript:
-        manuscript = self.repo.get(manuscript_id)
+    def get(self, manuscript_id: UUID, *, include_deleted: bool = False) -> Manuscript:
+        manuscript = self.repo.get(manuscript_id, include_deleted=include_deleted)
         if manuscript is None:
             raise ManuscriptNotFound(f"Manuscript {manuscript_id} not found")
         return manuscript
 
-    def list_by_author(self, author_id: UUID) -> list[Manuscript]:
-        return self.repo.list_by_author(author_id)
+    def list_by_author(self, author_id: UUID, *, include_deleted: bool = False) -> list[Manuscript]:
+        return self.repo.list_by_author(author_id, include_deleted=include_deleted)
 
     def update_metadata(
         self,
@@ -67,6 +74,34 @@ class ManuscriptService:
     def delete(self, manuscript_id: UUID) -> None:
         self.repo.delete(manuscript_id)
 
-    def check_ownership(self, manuscript_id: UUID, author_id: UUID) -> bool:
-        manuscript = self.repo.get(manuscript_id)
+    def soft_delete(self, manuscript_id: UUID) -> None:
+        """Soft delete manuscript and cascade to samples and ebooks."""
+        # Verify manuscript exists
+        self.get(manuscript_id)
+
+        # Cascade soft delete to samples and ebooks
+        if self.sample_repo:
+            self.sample_repo.soft_delete_by_manuscript(manuscript_id)
+        if self.ebook_repo:
+            self.ebook_repo.soft_delete_by_manuscript(manuscript_id)
+
+        # Soft delete the manuscript itself
+        self.repo.soft_delete(manuscript_id)
+
+    def restore(self, manuscript_id: UUID) -> None:
+        """Restore manuscript and cascade restore to samples and ebooks."""
+        # Get including deleted to verify it exists
+        self.get(manuscript_id, include_deleted=True)
+
+        # Restore manuscript first
+        self.repo.restore(manuscript_id)
+
+        # Cascade restore to samples and ebooks
+        if self.sample_repo:
+            self.sample_repo.restore_by_manuscript(manuscript_id)
+        if self.ebook_repo:
+            self.ebook_repo.restore_by_manuscript(manuscript_id)
+
+    def check_ownership(self, manuscript_id: UUID, author_id: UUID, *, include_deleted: bool = False) -> bool:
+        manuscript = self.repo.get(manuscript_id, include_deleted=include_deleted)
         return manuscript is not None and manuscript.author_id == author_id

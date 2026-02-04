@@ -18,3 +18,14 @@ class Download:
     downloaded_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     ip_hash: str | None = None
     tracking_code: str | None = None
+    deleted_at: datetime | None = None
+
+    @property
+    def is_deleted(self) -> bool:
+        return self.deleted_at is not None
+
+    def soft_delete(self) -> None:
+        self.deleted_at = datetime.now(timezone.utc)
+
+    def restore(self) -> None:
+        self.deleted_at = None

@@ -16,6 +16,7 @@ from app.repositories import (
     SQLAlchemyDownloadRepository,
     SQLAlchemyEbookRepository,
     SQLAlchemyManuscriptRepository,
+    SQLAlchemySampleRepository,
 )
 from app.schemas import EbookGenerateRequest, EbookListItem, EbookRead
 from app.security.auth import CurrentAuthorId, OptionalAuthorId
@@ -26,8 +27,10 @@ router = APIRouter()
 
 
 def get_manuscript_service(db: Annotated[Session, Depends(get_db)]) -> ManuscriptService:
-    repo = SQLAlchemyManuscriptRepository(db)
-    return ManuscriptService(repo)
+    manuscript_repo = SQLAlchemyManuscriptRepository(db)
+    sample_repo = SQLAlchemySampleRepository(db)
+    ebook_repo = SQLAlchemyEbookRepository(db)
+    return ManuscriptService(manuscript_repo, sample_repo, ebook_repo)
 
 
 def get_ebook_service(db: Annotated[Session, Depends(get_db)]) -> EbookService:
@@ -48,9 +51,10 @@ def get_download_repo(db: Annotated[Session, Depends(get_db)]) -> SQLAlchemyDown
 def list_ebooks(
     author_id: CurrentAuthorId,
     ebook_service: Annotated[EbookService, Depends(get_ebook_service)],
+    include_deleted: Annotated[bool, Query()] = False,
 ) -> list[EbookListItem]:
     """List all ebooks for the current author."""
-    ebooks = ebook_service.list_by_author(author_id)
+    ebooks = ebook_service.list_by_author(author_id, include_deleted=include_deleted)
     return [
         EbookListItem(
             id=e.id,
@@ -60,6 +64,7 @@ def list_ebooks(
             file_size_bytes=e.file_size_bytes,
             download_count=e.download_count,
             created_at=e.created_at,
+            deleted_at=e.deleted_at,
         )
         for e in ebooks
     ]
@@ -175,7 +180,7 @@ async def delete_ebook(
     ebook_service: Annotated[EbookService, Depends(get_ebook_service)],
     db: Annotated[Session, Depends(get_db)],
 ) -> None:
-    """Delete an ebook."""
+    """Soft delete an ebook. Files are retained for potential restoration."""
     try:
         eid = UUID(ebook_id)
     except ValueError:
@@ -189,15 +194,45 @@ async def delete_ebook(
     if not manuscript_service.check_ownership(ebook.manuscript_id, author_id):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ebook not found")
 
-    # Delete file from storage
-    storage = get_storage_backend()
-    try:
-        await storage.delete(ebook.file_key)
-    except FileNotFoundError:
-        pass
-
-    ebook_service.delete(eid)
+    ebook_service.soft_delete(eid)
     db.commit()
+
+
+@router.post("/{ebook_id}/restore", response_model=EbookRead)
+def restore_ebook(
+    ebook_id: str,
+    author_id: CurrentAuthorId,
+    manuscript_service: Annotated[ManuscriptService, Depends(get_manuscript_service)],
+    ebook_service: Annotated[EbookService, Depends(get_ebook_service)],
+    db: Annotated[Session, Depends(get_db)],
+) -> EbookRead:
+    """Restore a soft-deleted ebook."""
+    try:
+        eid = UUID(ebook_id)
+    except ValueError:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ebook not found")
+
+    try:
+        ebook = ebook_service.get(eid, include_deleted=True)
+    except EbookNotFound:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ebook not found")
+
+    if not manuscript_service.check_ownership(ebook.manuscript_id, author_id, include_deleted=True):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ebook not found")
+
+    ebook_service.restore(eid)
+    db.commit()
+
+    ebook = ebook_service.get(eid)
+    return EbookRead(
+        id=ebook.id,
+        manuscript_id=ebook.manuscript_id,
+        sample_id=ebook.sample_id,
+        output_format=ebook.output_format,
+        file_size_bytes=ebook.file_size_bytes,
+        download_count=ebook.download_count,
+        created_at=ebook.created_at,
+    )
 
 
 # Ebook generation endpoint (on manuscript)

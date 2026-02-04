@@ -4,7 +4,7 @@ Manuscript management endpoints.
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile, status
 from sqlalchemy.orm import Session
 
 from app.db import get_db
@@ -24,14 +24,17 @@ router = APIRouter()
 
 def get_manuscript_service(db: Annotated[Session, Depends(get_db)]) -> ManuscriptService:
     """Dependency to get a ManuscriptService with database session."""
-    repo = SQLAlchemyManuscriptRepository(db)
-    return ManuscriptService(repo)
+    manuscript_repo = SQLAlchemyManuscriptRepository(db)
+    sample_repo = SQLAlchemySampleRepository(db)
+    ebook_repo = SQLAlchemyEbookRepository(db)
+    return ManuscriptService(manuscript_repo, sample_repo, ebook_repo)
 
 
 def get_sample_service(db: Annotated[Session, Depends(get_db)]) -> SampleService:
     """Dependency to get a SampleService with database session."""
     repo = SQLAlchemySampleRepository(db)
-    return SampleService(repo)
+    ebook_repo = SQLAlchemyEbookRepository(db)
+    return SampleService(repo, ebook_repo)
 
 
 def get_ebook_service(db: Annotated[Session, Depends(get_db)]) -> EbookService:
@@ -108,9 +111,10 @@ async def create_manuscript(
 def list_manuscripts(
     author_id: CurrentAuthorId,
     service: Annotated[ManuscriptService, Depends(get_manuscript_service)],
+    include_deleted: Annotated[bool, Query()] = False,
 ) -> list[ManuscriptListItem]:
     """List all manuscripts for the current author."""
-    manuscripts = service.list_by_author(author_id)
+    manuscripts = service.list_by_author(author_id, include_deleted=include_deleted)
     return [
         ManuscriptListItem(
             id=m.id,
@@ -119,6 +123,7 @@ def list_manuscripts(
             source_format=m.source_format,
             created_at=m.created_at,
             updated_at=m.updated_at,
+            deleted_at=m.deleted_at,
         )
         for m in manuscripts
     ]
@@ -299,13 +304,12 @@ async def delete_manuscript(
     manuscript_id: str,
     author_id: CurrentAuthorId,
     service: Annotated[ManuscriptService, Depends(get_manuscript_service)],
-    ebook_service: Annotated[EbookService, Depends(get_ebook_service)],
     db: Annotated[Session, Depends(get_db)],
 ) -> None:
     """
-    Delete a manuscript and all associated ebooks and samples.
+    Soft delete a manuscript and all associated ebooks and samples.
 
-    This will also delete the source file from storage.
+    Files are retained in storage for potential restoration.
     """
     from uuid import UUID
 
@@ -318,25 +322,47 @@ async def delete_manuscript(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Manuscript not found")
 
     try:
+        service.soft_delete(mid)
+        db.commit()
+    except ManuscriptNotFound:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Manuscript not found")
+
+
+@router.post("/{manuscript_id}/restore", response_model=ManuscriptRead)
+def restore_manuscript(
+    manuscript_id: str,
+    author_id: CurrentAuthorId,
+    service: Annotated[ManuscriptService, Depends(get_manuscript_service)],
+    db: Annotated[Session, Depends(get_db)],
+) -> ManuscriptRead:
+    """
+    Restore a soft-deleted manuscript and all associated samples and ebooks.
+    """
+    from uuid import UUID
+
+    try:
+        mid = UUID(manuscript_id)
+    except ValueError:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Manuscript not found")
+
+    # Check ownership including deleted manuscripts
+    if not service.check_ownership(mid, author_id, include_deleted=True):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Manuscript not found")
+
+    try:
+        service.restore(mid)
+        db.commit()
         manuscript = service.get(mid)
     except ManuscriptNotFound:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Manuscript not found")
 
-    # Delete source file from storage
-    storage = get_storage_backend()
-    try:
-        await storage.delete(manuscript.source_file_key)
-    except FileNotFoundError:
-        pass  # File already deleted
-
-    # Delete associated ebooks from storage
-    ebooks = ebook_service.list_by_manuscript(mid)
-    for ebook in ebooks:
-        try:
-            await storage.delete(ebook.file_key)
-        except FileNotFoundError:
-            pass
-
-    # Delete manuscript (cascades to samples and ebooks in DB)
-    service.delete(mid)
-    db.commit()
+    return ManuscriptRead(
+        id=manuscript.id,
+        author_id=manuscript.author_id,
+        title=manuscript.title,
+        description=manuscript.description,
+        source_format=manuscript.source_format,
+        state=manuscript.state,
+        created_at=manuscript.created_at,
+        updated_at=manuscript.updated_at,
+    )

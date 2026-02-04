@@ -55,3 +55,4 @@ class ManuscriptListItem(BaseModel):
     source_format: SourceFormat
     created_at: datetime
     updated_at: datetime
+    deleted_at: datetime | None = None

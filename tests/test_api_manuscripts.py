@@ -519,3 +519,218 @@ class TestInputValidation:
         )
 
         assert response.status_code == 422
+
+
+class TestSoftDelete:
+    """Tests for soft delete and restore functionality."""
+
+    def test_delete_is_soft_delete(
+        self, client: TestClient, auth_headers: dict, sample_epub: bytes
+    ):
+        """Deleting a manuscript should be a soft delete."""
+        # Create manuscript
+        create_response = client.post(
+            "/manuscripts/",
+            headers=auth_headers,
+            data={"title": "Soft Delete Test", "source_format": "epub"},
+            files={"file": ("book.epub", io.BytesIO(sample_epub), "application/epub+zip")},
+        )
+        manuscript_id = create_response.json()["id"]
+
+        # Delete it
+        delete_response = client.delete(f"/manuscripts/{manuscript_id}", headers=auth_headers)
+        assert delete_response.status_code == 204
+
+        # Should not appear in normal list
+        list_response = client.get("/manuscripts/", headers=auth_headers)
+        assert all(m["id"] != manuscript_id for m in list_response.json())
+
+        # Should appear in list with include_deleted=true
+        list_deleted_response = client.get(
+            "/manuscripts/?include_deleted=true", headers=auth_headers
+        )
+        deleted_manuscripts = [m for m in list_deleted_response.json() if m["id"] == manuscript_id]
+        assert len(deleted_manuscripts) == 1
+        assert deleted_manuscripts[0]["deleted_at"] is not None
+
+    def test_restore_manuscript(
+        self, client: TestClient, auth_headers: dict, sample_epub: bytes
+    ):
+        """Restoring a soft-deleted manuscript should make it active again."""
+        # Create and delete manuscript
+        create_response = client.post(
+            "/manuscripts/",
+            headers=auth_headers,
+            data={"title": "Restore Test", "source_format": "epub"},
+            files={"file": ("book.epub", io.BytesIO(sample_epub), "application/epub+zip")},
+        )
+        manuscript_id = create_response.json()["id"]
+        client.delete(f"/manuscripts/{manuscript_id}", headers=auth_headers)
+
+        # Restore it
+        restore_response = client.post(
+            f"/manuscripts/{manuscript_id}/restore", headers=auth_headers
+        )
+        assert restore_response.status_code == 200
+        assert restore_response.json()["id"] == manuscript_id
+        assert restore_response.json()["title"] == "Restore Test"
+
+        # Should now appear in normal list
+        list_response = client.get("/manuscripts/", headers=auth_headers)
+        assert any(m["id"] == manuscript_id for m in list_response.json())
+
+        # Should be accessible via get
+        get_response = client.get(f"/manuscripts/{manuscript_id}", headers=auth_headers)
+        assert get_response.status_code == 200
+
+    def test_restore_not_found_for_wrong_owner(self, client: TestClient, sample_epub: bytes):
+        """Restoring another user's deleted manuscript should return 404."""
+        import uuid as uuid_mod
+
+        # Create with user 1
+        response1 = client.post(
+            "/auth/register",
+            json={
+                "email": f"owner-restore-{uuid_mod.uuid4()}@example.com",
+                "password": "password",
+                "display_name": "Owner",
+            },
+        )
+        headers1 = {"Authorization": f"Bearer {response1.json()['access_token']}"}
+
+        create_response = client.post(
+            "/manuscripts/",
+            headers=headers1,
+            data={"title": "Protected Book", "source_format": "epub"},
+            files={"file": ("book.epub", io.BytesIO(sample_epub), "application/epub+zip")},
+        )
+        manuscript_id = create_response.json()["id"]
+
+        # Delete it
+        client.delete(f"/manuscripts/{manuscript_id}", headers=headers1)
+
+        # Try to restore with user 2
+        response2 = client.post(
+            "/auth/register",
+            json={
+                "email": f"attacker-restore-{uuid_mod.uuid4()}@example.com",
+                "password": "password",
+                "display_name": "Attacker",
+            },
+        )
+        headers2 = {"Authorization": f"Bearer {response2.json()['access_token']}"}
+
+        restore_response = client.post(
+            f"/manuscripts/{manuscript_id}/restore", headers=headers2
+        )
+        assert restore_response.status_code == 404
+
+    def test_cascade_delete_samples_and_ebooks(
+        self, client: TestClient, auth_headers: dict, sample_epub: bytes
+    ):
+        """Deleting a manuscript should cascade soft delete to samples and ebooks."""
+        # Create manuscript
+        create_response = client.post(
+            "/manuscripts/",
+            headers=auth_headers,
+            data={"title": "Cascade Delete Test", "source_format": "epub"},
+            files={"file": ("book.epub", io.BytesIO(sample_epub), "application/epub+zip")},
+        )
+        manuscript_id = create_response.json()["id"]
+
+        # Mark ready for ebook generation
+        client.post(f"/manuscripts/{manuscript_id}/ready", headers=auth_headers)
+
+        # Create a sample
+        sample_response = client.post(
+            f"/samples/manuscripts/{manuscript_id}/samples",
+            headers=auth_headers,
+            json={
+                "title": "Chapter 1 Sample",
+                "excerpt_start": "1",
+                "excerpt_end": "10",
+            },
+        )
+        sample_id = sample_response.json()["id"]
+
+        # Generate ebook for manuscript
+        ebook_response = client.post(
+            f"/ebooks/manuscripts/{manuscript_id}/generate",
+            headers=auth_headers,
+            json={"output_formats": ["epub"]},
+        )
+        assert ebook_response.status_code == 200
+        ebook_id = ebook_response.json()[0]["id"]
+
+        # Delete manuscript
+        client.delete(f"/manuscripts/{manuscript_id}", headers=auth_headers)
+
+        # Sample should not appear in normal list
+        samples_response = client.get(
+            f"/samples/manuscripts/{manuscript_id}/samples?include_deleted=true",
+            headers=auth_headers,
+        )
+        assert samples_response.status_code == 200
+        samples = samples_response.json()
+        deleted_sample = next((s for s in samples if s["id"] == sample_id), None)
+        assert deleted_sample is not None
+        assert deleted_sample["deleted_at"] is not None
+
+        # Ebook should also be soft deleted
+        ebooks_response = client.get("/ebooks/?include_deleted=true", headers=auth_headers)
+        deleted_ebook = next((e for e in ebooks_response.json() if e["id"] == ebook_id), None)
+        assert deleted_ebook is not None
+        assert deleted_ebook["deleted_at"] is not None
+
+    def test_cascade_restore(
+        self, client: TestClient, auth_headers: dict, sample_epub: bytes
+    ):
+        """Restoring a manuscript should cascade restore to samples and ebooks."""
+        # Create manuscript
+        create_response = client.post(
+            "/manuscripts/",
+            headers=auth_headers,
+            data={"title": "Cascade Restore Test", "source_format": "epub"},
+            files={"file": ("book.epub", io.BytesIO(sample_epub), "application/epub+zip")},
+        )
+        manuscript_id = create_response.json()["id"]
+
+        # Mark ready for ebook generation
+        client.post(f"/manuscripts/{manuscript_id}/ready", headers=auth_headers)
+
+        # Create a sample
+        sample_response = client.post(
+            f"/samples/manuscripts/{manuscript_id}/samples",
+            headers=auth_headers,
+            json={
+                "title": "Chapter 1 Sample",
+                "excerpt_start": "1",
+                "excerpt_end": "10",
+            },
+        )
+        sample_id = sample_response.json()["id"]
+
+        # Generate ebook
+        ebook_response = client.post(
+            f"/ebooks/manuscripts/{manuscript_id}/generate",
+            headers=auth_headers,
+            json={"output_formats": ["epub"]},
+        )
+        ebook_id = ebook_response.json()[0]["id"]
+
+        # Delete and restore manuscript
+        client.delete(f"/manuscripts/{manuscript_id}", headers=auth_headers)
+        client.post(f"/manuscripts/{manuscript_id}/restore", headers=auth_headers)
+
+        # Sample should be restored
+        samples_response = client.get(
+            f"/samples/manuscripts/{manuscript_id}/samples",
+            headers=auth_headers,
+        )
+        restored_sample = next((s for s in samples_response.json() if s["id"] == sample_id), None)
+        assert restored_sample is not None
+
+        # Ebook should be restored
+        ebooks_response = client.get("/ebooks/", headers=auth_headers)
+        restored_ebook = next((e for e in ebooks_response.json() if e["id"] == ebook_id), None)
+        assert restored_ebook is not None

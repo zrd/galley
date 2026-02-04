@@ -34,3 +34,4 @@ class EbookListItem(BaseModel):
     file_size_bytes: int
     download_count: int
     created_at: datetime
+    deleted_at: datetime | None = None
