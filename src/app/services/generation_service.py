@@ -9,7 +9,7 @@ Handles generating ebooks from manuscripts, including:
 from uuid import UUID
 
 from app.domain import Ebook, Manuscript, OutputFormat, Sample
-from app.repositories import InMemoryEbookRepository
+from app.repositories.protocols import EbookRepository
 from app.storage import generate_file_key, get_content_type_for_format, get_storage_backend
 
 from .conversion_service import ConversionService, get_conversion_service
@@ -28,7 +28,7 @@ class GenerationService:
 
     def __init__(
         self,
-        ebook_repo: InMemoryEbookRepository,
+        ebook_repo: EbookRepository,
         conversion_service: ConversionService | None = None,
     ) -> None:
         self.ebook_repo = ebook_repo

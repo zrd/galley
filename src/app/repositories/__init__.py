@@ -1,10 +1,3 @@
-from .in_memory import (
-    InMemoryAuthorRepository,
-    InMemoryDownloadRepository,
-    InMemoryEbookRepository,
-    InMemoryManuscriptRepository,
-    InMemorySampleRepository,
-)
 from .protocols import (
     AuthorRepository,
     DownloadRepository,
@@ -27,12 +20,6 @@ __all__ = [
     "EbookRepository",
     "ManuscriptRepository",
     "SampleRepository",
-    # In-memory implementations
-    "InMemoryAuthorRepository",
-    "InMemoryDownloadRepository",
-    "InMemoryEbookRepository",
-    "InMemoryManuscriptRepository",
-    "InMemorySampleRepository",
     # SQLAlchemy implementations
     "SQLAlchemyAuthorRepository",
     "SQLAlchemyDownloadRepository",
