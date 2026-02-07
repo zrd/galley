@@ -299,6 +299,82 @@ def mark_manuscript_ready(
     )
 
 
+@router.post("/{manuscript_id}/archive", response_model=ManuscriptRead)
+def archive_manuscript(
+    manuscript_id: str,
+    author_id: CurrentAuthorId,
+    service: Annotated[ManuscriptService, Depends(get_manuscript_service)],
+    db: Annotated[Session, Depends(get_db)],
+) -> ManuscriptRead:
+    """Archive a manuscript to hide it from normal listings."""
+    from uuid import UUID
+
+    try:
+        mid = UUID(manuscript_id)
+    except ValueError:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Manuscript not found")
+
+    if not service.check_ownership(mid, author_id):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Manuscript not found")
+
+    try:
+        manuscript = service.archive(mid)
+        db.commit()
+    except ManuscriptNotFound:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Manuscript not found")
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+    return ManuscriptRead(
+        id=manuscript.id,
+        author_id=manuscript.author_id,
+        title=manuscript.title,
+        description=manuscript.description,
+        source_format=manuscript.source_format,
+        state=manuscript.state,
+        created_at=manuscript.created_at,
+        updated_at=manuscript.updated_at,
+    )
+
+
+@router.post("/{manuscript_id}/unarchive", response_model=ManuscriptRead)
+def unarchive_manuscript(
+    manuscript_id: str,
+    author_id: CurrentAuthorId,
+    service: Annotated[ManuscriptService, Depends(get_manuscript_service)],
+    db: Annotated[Session, Depends(get_db)],
+) -> ManuscriptRead:
+    """Restore an archived manuscript to ready state."""
+    from uuid import UUID
+
+    try:
+        mid = UUID(manuscript_id)
+    except ValueError:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Manuscript not found")
+
+    if not service.check_ownership(mid, author_id):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Manuscript not found")
+
+    try:
+        manuscript = service.unarchive(mid)
+        db.commit()
+    except ManuscriptNotFound:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Manuscript not found")
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+    return ManuscriptRead(
+        id=manuscript.id,
+        author_id=manuscript.author_id,
+        title=manuscript.title,
+        description=manuscript.description,
+        source_format=manuscript.source_format,
+        state=manuscript.state,
+        created_at=manuscript.created_at,
+        updated_at=manuscript.updated_at,
+    )
+
+
 @router.delete("/{manuscript_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_manuscript(
     manuscript_id: str,

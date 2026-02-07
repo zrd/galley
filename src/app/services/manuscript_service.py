@@ -71,6 +71,11 @@ class ManuscriptService:
         manuscript.archive()
         return self.repo.update(manuscript)
 
+    def unarchive(self, manuscript_id: UUID) -> Manuscript:
+        manuscript = self.get(manuscript_id)
+        manuscript.unarchive()
+        return self.repo.update(manuscript)
+
     def delete(self, manuscript_id: UUID) -> None:
         self.repo.delete(manuscript_id)
 

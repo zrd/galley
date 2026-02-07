@@ -734,3 +734,174 @@ class TestSoftDelete:
         ebooks_response = client.get("/ebooks/", headers=auth_headers)
         restored_ebook = next((e for e in ebooks_response.json() if e["id"] == ebook_id), None)
         assert restored_ebook is not None
+
+
+class TestArchiveManuscript:
+    """Tests for archive and unarchive functionality."""
+
+    def test_archive_manuscript_success(
+        self, client: TestClient, auth_headers: dict, sample_epub: bytes
+    ):
+        """Archiving a ready manuscript should set state to archived."""
+        # Create manuscript and mark ready
+        create_response = client.post(
+            "/manuscripts/",
+            headers=auth_headers,
+            data={"title": "Archive Test", "source_format": "epub"},
+            files={"file": ("book.epub", io.BytesIO(sample_epub), "application/epub+zip")},
+        )
+        manuscript_id = create_response.json()["id"]
+        client.post(f"/manuscripts/{manuscript_id}/ready", headers=auth_headers)
+
+        # Archive it
+        response = client.post(f"/manuscripts/{manuscript_id}/archive", headers=auth_headers)
+
+        assert response.status_code == 200
+        assert response.json()["state"] == "archived"
+
+    def test_archive_already_archived_fails(
+        self, client: TestClient, auth_headers: dict, sample_epub: bytes
+    ):
+        """Archiving an already archived manuscript should fail."""
+        # Create manuscript, mark ready, and archive
+        create_response = client.post(
+            "/manuscripts/",
+            headers=auth_headers,
+            data={"title": "Already Archived Test", "source_format": "epub"},
+            files={"file": ("book.epub", io.BytesIO(sample_epub), "application/epub+zip")},
+        )
+        manuscript_id = create_response.json()["id"]
+        client.post(f"/manuscripts/{manuscript_id}/ready", headers=auth_headers)
+        client.post(f"/manuscripts/{manuscript_id}/archive", headers=auth_headers)
+
+        # Try to archive again
+        response = client.post(f"/manuscripts/{manuscript_id}/archive", headers=auth_headers)
+
+        assert response.status_code == 400
+
+    def test_archive_wrong_owner(self, client: TestClient, sample_epub: bytes):
+        """Archiving another user's manuscript should return 404."""
+        import uuid as uuid_mod
+
+        # Create with user 1
+        response1 = client.post(
+            "/auth/register",
+            json={
+                "email": f"owner-archive-{uuid_mod.uuid4()}@example.com",
+                "password": "password",
+                "display_name": "Owner",
+            },
+        )
+        headers1 = {"Authorization": f"Bearer {response1.json()['access_token']}"}
+
+        create_response = client.post(
+            "/manuscripts/",
+            headers=headers1,
+            data={"title": "Protected Book", "source_format": "epub"},
+            files={"file": ("book.epub", io.BytesIO(sample_epub), "application/epub+zip")},
+        )
+        manuscript_id = create_response.json()["id"]
+        client.post(f"/manuscripts/{manuscript_id}/ready", headers=headers1)
+
+        # Try to archive with user 2
+        response2 = client.post(
+            "/auth/register",
+            json={
+                "email": f"attacker-archive-{uuid_mod.uuid4()}@example.com",
+                "password": "password",
+                "display_name": "Attacker",
+            },
+        )
+        headers2 = {"Authorization": f"Bearer {response2.json()['access_token']}"}
+
+        response = client.post(f"/manuscripts/{manuscript_id}/archive", headers=headers2)
+        assert response.status_code == 404
+
+    def test_archive_malformed_uuid(self, client: TestClient, auth_headers: dict):
+        """Archive with malformed UUID should return 404."""
+        response = client.post("/manuscripts/not-a-uuid/archive", headers=auth_headers)
+        assert response.status_code == 404
+
+    def test_unarchive_manuscript_success(
+        self, client: TestClient, auth_headers: dict, sample_epub: bytes
+    ):
+        """Unarchiving an archived manuscript should restore it to ready state."""
+        # Create, mark ready, and archive
+        create_response = client.post(
+            "/manuscripts/",
+            headers=auth_headers,
+            data={"title": "Unarchive Test", "source_format": "epub"},
+            files={"file": ("book.epub", io.BytesIO(sample_epub), "application/epub+zip")},
+        )
+        manuscript_id = create_response.json()["id"]
+        client.post(f"/manuscripts/{manuscript_id}/ready", headers=auth_headers)
+        client.post(f"/manuscripts/{manuscript_id}/archive", headers=auth_headers)
+
+        # Unarchive it
+        response = client.post(f"/manuscripts/{manuscript_id}/unarchive", headers=auth_headers)
+
+        assert response.status_code == 200
+        assert response.json()["state"] == "ready"
+
+    def test_unarchive_not_archived_fails(
+        self, client: TestClient, auth_headers: dict, sample_epub: bytes
+    ):
+        """Unarchiving a non-archived manuscript should fail."""
+        # Create manuscript and mark ready (but don't archive)
+        create_response = client.post(
+            "/manuscripts/",
+            headers=auth_headers,
+            data={"title": "Not Archived", "source_format": "epub"},
+            files={"file": ("book.epub", io.BytesIO(sample_epub), "application/epub+zip")},
+        )
+        manuscript_id = create_response.json()["id"]
+        client.post(f"/manuscripts/{manuscript_id}/ready", headers=auth_headers)
+
+        # Try to unarchive
+        response = client.post(f"/manuscripts/{manuscript_id}/unarchive", headers=auth_headers)
+
+        assert response.status_code == 400
+
+    def test_unarchive_wrong_owner(self, client: TestClient, sample_epub: bytes):
+        """Unarchiving another user's manuscript should return 404."""
+        import uuid as uuid_mod
+
+        # Create with user 1
+        response1 = client.post(
+            "/auth/register",
+            json={
+                "email": f"owner-unarchive-{uuid_mod.uuid4()}@example.com",
+                "password": "password",
+                "display_name": "Owner",
+            },
+        )
+        headers1 = {"Authorization": f"Bearer {response1.json()['access_token']}"}
+
+        create_response = client.post(
+            "/manuscripts/",
+            headers=headers1,
+            data={"title": "Protected Book", "source_format": "epub"},
+            files={"file": ("book.epub", io.BytesIO(sample_epub), "application/epub+zip")},
+        )
+        manuscript_id = create_response.json()["id"]
+        client.post(f"/manuscripts/{manuscript_id}/ready", headers=headers1)
+        client.post(f"/manuscripts/{manuscript_id}/archive", headers=headers1)
+
+        # Try to unarchive with user 2
+        response2 = client.post(
+            "/auth/register",
+            json={
+                "email": f"attacker-unarchive-{uuid_mod.uuid4()}@example.com",
+                "password": "password",
+                "display_name": "Attacker",
+            },
+        )
+        headers2 = {"Authorization": f"Bearer {response2.json()['access_token']}"}
+
+        response = client.post(f"/manuscripts/{manuscript_id}/unarchive", headers=headers2)
+        assert response.status_code == 404
+
+    def test_unarchive_malformed_uuid(self, client: TestClient, auth_headers: dict):
+        """Unarchive with malformed UUID should return 404."""
+        response = client.post("/manuscripts/not-a-uuid/unarchive", headers=auth_headers)
+        assert response.status_code == 404
