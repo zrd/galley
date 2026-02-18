@@ -48,3 +48,13 @@ htmlcov/
 
 # ruff
 .ruff_cache/
+
+# Node.js / Frontend
+node_modules/
+frontend/dist/
+*.log
+npm-debug.log*
+
+# OS files
+.DS_Store
+Thumbs.db
