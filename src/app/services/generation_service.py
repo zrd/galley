@@ -38,6 +38,7 @@ class GenerationService:
         self,
         manuscript: Manuscript,
         output_format: OutputFormat,
+        author_display_name: str,
     ) -> Ebook:
         """
         Generate a full ebook from a manuscript.
@@ -45,6 +46,7 @@ class GenerationService:
         Args:
             manuscript: The manuscript to generate from
             output_format: The desired output format
+            author_display_name: The author's display name for the filename
 
         Returns:
             The generated Ebook entity
@@ -79,11 +81,13 @@ class GenerationService:
         await storage.upload(file_key, output_data, content_type)
 
         # Create ebook record
+        download_filename = f"{author_display_name} - {manuscript.title}.{output_format.value}"
         ebook = Ebook(
             manuscript_id=manuscript.id,
             output_format=output_format,
             file_key=file_key,
             file_size_bytes=len(output_data),
+            download_filename=download_filename,
             sample_id=None,
         )
 
@@ -94,6 +98,7 @@ class GenerationService:
         manuscript: Manuscript,
         sample: Sample,
         output_format: OutputFormat,
+        author_display_name: str,
     ) -> Ebook:
         """
         Generate a sample ebook from a manuscript and sample definition.
@@ -111,6 +116,7 @@ class GenerationService:
             manuscript: The source manuscript
             sample: The sample definition
             output_format: The desired output format
+            author_display_name: The author's display name for the filename
 
         Returns:
             The generated sample Ebook entity
@@ -151,11 +157,13 @@ class GenerationService:
         await storage.upload(file_key, output_data, content_type)
 
         # Create ebook record
+        download_filename = f"{author_display_name} - {manuscript.title} ({sample.title}).{output_format.value}"
         ebook = Ebook(
             manuscript_id=manuscript.id,
             output_format=output_format,
             file_key=file_key,
             file_size_bytes=len(output_data),
+            download_filename=download_filename,
             sample_id=sample.id,
         )
 

@@ -135,6 +135,7 @@ class EbookModel(Base):
     )
     file_key: Mapped[str] = mapped_column(String(512), nullable=False)
     file_size_bytes: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    download_filename: Mapped[str] = mapped_column(String(512), nullable=False)
     download_count: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)

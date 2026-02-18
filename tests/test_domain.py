@@ -118,6 +118,7 @@ class TestEbook:
             output_format=OutputFormat.EPUB,
             file_key="ebooks/test.epub",
             file_size_bytes=1024,
+            download_filename="Test Author - Test Book.epub",
         )
 
         assert ebook.output_format == OutputFormat.EPUB
@@ -132,6 +133,7 @@ class TestEbook:
             output_format=OutputFormat.EPUB,
             file_key="ebooks/test.epub",
             file_size_bytes=1024,
+            download_filename="Test Author - Test Book.epub",
         )
 
         ebook.increment_download_count()
@@ -148,6 +150,7 @@ class TestEbook:
             output_format=OutputFormat.EPUB,
             file_key="ebooks/test.epub",
             file_size_bytes=1024,
+            download_filename="Test Author - Test Book.epub",
         )
         assert not full_ebook.is_sample()
 
@@ -156,6 +159,7 @@ class TestEbook:
             output_format=OutputFormat.EPUB,
             file_key="samples/test.epub",
             file_size_bytes=512,
+            download_filename="Test Author - Test Book (Sample).epub",
             sample_id=uuid4(),
         )
         assert sample_ebook.is_sample()

@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 from app.db import get_db
 from app.domain import Download, EbookNotFound, ManuscriptNotFound
 from app.repositories import (
+    SQLAlchemyAuthorRepository,
     SQLAlchemyDownloadRepository,
     SQLAlchemyEbookRepository,
     SQLAlchemyManuscriptRepository,
@@ -20,7 +21,7 @@ from app.repositories import (
 )
 from app.schemas import EbookGenerateRequest, EbookListItem, EbookRead
 from app.security.auth import CurrentAuthorId, OptionalAuthorId
-from app.services import EbookService, GenerationError, GenerationService, ManuscriptService
+from app.services import AuthorService, EbookService, GenerationError, GenerationService, ManuscriptService
 from app.storage import get_content_type_for_format, get_storage_backend
 
 router = APIRouter()
@@ -45,6 +46,11 @@ def get_generation_service(db: Annotated[Session, Depends(get_db)]) -> Generatio
 
 def get_download_repo(db: Annotated[Session, Depends(get_db)]) -> SQLAlchemyDownloadRepository:
     return SQLAlchemyDownloadRepository(db)
+
+
+def get_author_service(db: Annotated[Session, Depends(get_db)]) -> AuthorService:
+    repo = SQLAlchemyAuthorRepository(db)
+    return AuthorService(repo)
 
 
 @router.get("/", response_model=list[EbookListItem])
@@ -160,13 +166,12 @@ async def download_ebook(
 
     # Return file
     content_type = get_content_type_for_format(ebook.output_format.value)
-    filename = f"ebook.{ebook.output_format.value}"
 
     return Response(
         content=file_data,
         media_type=content_type,
         headers={
-            "Content-Disposition": f'attachment; filename="{filename}"',
+            "Content-Disposition": f'attachment; filename="{ebook.download_filename}"',
             "Content-Length": str(len(file_data)),
         },
     )
@@ -243,6 +248,7 @@ async def generate_ebooks(
     author_id: CurrentAuthorId,
     manuscript_service: Annotated[ManuscriptService, Depends(get_manuscript_service)],
     generation_service: Annotated[GenerationService, Depends(get_generation_service)],
+    author_service: Annotated[AuthorService, Depends(get_author_service)],
     db: Annotated[Session, Depends(get_db)],
 ) -> list[EbookRead]:
     """
@@ -263,12 +269,16 @@ async def generate_ebooks(
     except ManuscriptNotFound:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Manuscript not found")
 
+    # Get author for display name in filename
+    author = author_service.get(author_id)
+
     ebooks = []
     for output_format in generate_in.output_formats:
         try:
             ebook = await generation_service.generate_full_ebook(
                 manuscript=manuscript,
                 output_format=output_format,
+                author_display_name=author.display_name,
             )
             ebooks.append(ebook)
         except GenerationError as e:

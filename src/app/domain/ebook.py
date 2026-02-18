@@ -18,6 +18,7 @@ class Ebook:
     output_format: OutputFormat
     file_key: str
     file_size_bytes: int
+    download_filename: str
     id: UUID = field(default_factory=uuid4)
     sample_id: UUID | None = None
     download_count: int = 0
