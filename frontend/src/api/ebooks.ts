@@ -28,7 +28,6 @@ export const ebooksApi = {
   },
 
   getDownloadUrl(id: string): string {
-    const token = localStorage.getItem('access_token');
-    return `${API_BASE_URL}/ebooks/${id}/download?token=${token}`;
+    return `${API_BASE_URL}/ebooks/${id}/download`;
   },
 };

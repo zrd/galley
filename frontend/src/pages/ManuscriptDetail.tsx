@@ -7,8 +7,15 @@ import {
   useDeleteManuscript,
   useGenerateEbook,
 } from '../hooks/useManuscripts';
+import { useEbooksByManuscript } from '../hooks/useEbooks';
 import { ebooksApi } from '../api/ebooks';
 import type { OutputFormat, ManuscriptState } from '../types';
+
+function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
 
 const stateColors: Record<ManuscriptState, string> = {
   draft: 'bg-yellow-100 text-yellow-800',
@@ -21,6 +28,7 @@ export function ManuscriptDetail() {
   const navigate = useNavigate();
 
   const { data: manuscript, isLoading, error } = useManuscript(id!);
+  const { data: ebooks, isLoading: ebooksLoading } = useEbooksByManuscript(id!);
   const updateManuscript = useUpdateManuscript();
   const markReady = useMarkReady();
   const deleteManuscript = useDeleteManuscript();
@@ -247,6 +255,51 @@ export function ManuscriptDetail() {
           </button>
         </div>
       )}
+
+      {/* Ebooks Section */}
+      <div className="mt-6 rounded-lg border border-gray-200 bg-white p-6 shadow">
+        <h2 className="mb-4 text-lg font-semibold">Generated Ebooks</h2>
+
+        {ebooksLoading ? (
+          <p className="text-gray-600">Loading ebooks...</p>
+        ) : ebooks && ebooks.length > 0 ? (
+          <div className="space-y-3">
+            {ebooks.map((ebook) => (
+              <div
+                key={ebook.id}
+                className="flex items-center justify-between rounded border border-gray-200 p-3"
+              >
+                <div className="flex items-center space-x-4">
+                  <span className="inline-flex rounded bg-gray-100 px-2 py-1 text-xs font-semibold text-gray-800">
+                    {ebook.output_format.toUpperCase()}
+                  </span>
+                  <span className="text-sm text-gray-600">
+                    {formatBytes(ebook.file_size_bytes)}
+                  </span>
+                  <span className="text-sm text-gray-500">
+                    {ebook.download_count} downloads
+                  </span>
+                  {ebook.sample_id && (
+                    <span className="text-xs text-gray-500">(Sample)</span>
+                  )}
+                </div>
+                <a
+                  href={ebooksApi.getDownloadUrl(ebook.id)}
+                  className="rounded bg-blue-600 px-3 py-1 text-sm text-white hover:bg-blue-700"
+                  download
+                >
+                  Download
+                </a>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="text-gray-500">
+            No ebooks generated yet.{' '}
+            {manuscript.state === 'draft' && 'Mark the manuscript as ready to generate ebooks.'}
+          </p>
+        )}
+      </div>
     </div>
   );
 }

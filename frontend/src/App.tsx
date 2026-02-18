@@ -6,6 +6,7 @@ import { Register } from './pages/Register';
 import { Dashboard } from './pages/Dashboard';
 import { ManuscriptForm } from './pages/ManuscriptForm';
 import { ManuscriptDetail } from './pages/ManuscriptDetail';
+import { Ebooks } from './pages/Ebooks';
 
 function App() {
   return (
@@ -37,6 +38,14 @@ function App() {
           element={
             <ProtectedRoute>
               <ManuscriptDetail />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/ebooks"
+          element={
+            <ProtectedRoute>
+              <Ebooks />
             </ProtectedRoute>
           }
         />

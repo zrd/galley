@@ -24,13 +24,19 @@ export function Navbar() {
                   to="/dashboard"
                   className="text-gray-600 hover:text-gray-900"
                 >
-                  Dashboard
+                  Manuscripts
+                </Link>
+                <Link
+                  to="/ebooks"
+                  className="text-gray-600 hover:text-gray-900"
+                >
+                  Ebooks
                 </Link>
                 <Link
                   to="/manuscripts/new"
                   className="text-gray-600 hover:text-gray-900"
                 >
-                  New Manuscript
+                  Upload
                 </Link>
               </div>
             )}
