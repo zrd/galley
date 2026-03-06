@@ -162,8 +162,6 @@ async def download_ebook(
 
     # Increment download count
     ebook_service.increment_download(ebook.id)
-    db.commit()
-
     # Return file
     content_type = get_content_type_for_format(ebook.output_format.value)
 
@@ -200,7 +198,6 @@ async def delete_ebook(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ebook not found")
 
     ebook_service.soft_delete(eid)
-    db.commit()
 
 
 @router.post("/{ebook_id}/restore", response_model=EbookRead)
@@ -226,8 +223,6 @@ def restore_ebook(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ebook not found")
 
     ebook_service.restore(eid)
-    db.commit()
-
     ebook = ebook_service.get(eid)
     return EbookRead(
         id=ebook.id,
@@ -283,8 +278,6 @@ async def generate_ebooks(
             ebooks.append(ebook)
         except GenerationError as e:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
-
-    db.commit()
 
     return [
         EbookRead(

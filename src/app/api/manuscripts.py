@@ -93,8 +93,6 @@ async def create_manuscript(
         source_file_key=file_key,
         description=description,
     )
-    db.commit()
-
     return ManuscriptRead(
         id=manuscript.id,
         author_id=manuscript.author_id,
@@ -189,7 +187,6 @@ def update_manuscript(
             title=update_in.title,
             description=update_in.description,
         )
-        db.commit()
     except ManuscriptNotFound:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Manuscript not found")
 
@@ -245,7 +242,6 @@ async def update_manuscript_file(
     # Update manuscript with new file
     try:
         manuscript = service.update_source(mid, file_key, source_format)
-        db.commit()
     except ManuscriptNotFound:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Manuscript not found")
 
@@ -281,7 +277,6 @@ def mark_manuscript_ready(
 
     try:
         manuscript = service.mark_ready(mid)
-        db.commit()
     except ManuscriptNotFound:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Manuscript not found")
     except Exception as e:
@@ -319,7 +314,6 @@ def archive_manuscript(
 
     try:
         manuscript = service.archive(mid)
-        db.commit()
     except ManuscriptNotFound:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Manuscript not found")
     except Exception as e:
@@ -357,7 +351,6 @@ def unarchive_manuscript(
 
     try:
         manuscript = service.unarchive(mid)
-        db.commit()
     except ManuscriptNotFound:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Manuscript not found")
     except Exception as e:
@@ -399,7 +392,6 @@ async def delete_manuscript(
 
     try:
         service.soft_delete(mid)
-        db.commit()
     except ManuscriptNotFound:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Manuscript not found")
 
@@ -427,7 +419,6 @@ def restore_manuscript(
 
     try:
         service.restore(mid)
-        db.commit()
         manuscript = service.get(mid)
     except ManuscriptNotFound:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Manuscript not found")

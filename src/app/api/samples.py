@@ -84,8 +84,6 @@ def create_sample(
         promo_header=sample_in.promo_header,
         promo_footer=sample_in.promo_footer,
     )
-    db.commit()
-
     return SampleRead(
         id=sample.id,
         manuscript_id=sample.manuscript_id,
@@ -200,8 +198,6 @@ def update_sample(
         promo_header=update_in.promo_header,
         promo_footer=update_in.promo_footer,
     )
-    db.commit()
-
     return SampleRead(
         id=sample.id,
         manuscript_id=sample.manuscript_id,
@@ -238,7 +234,6 @@ def delete_sample(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Sample not found")
 
     sample_service.soft_delete(sid)
-    db.commit()
 
 
 @router.post("/{sample_id}/restore", response_model=SampleRead)
@@ -264,8 +259,6 @@ def restore_sample(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Sample not found")
 
     sample_service.restore(sid)
-    db.commit()
-
     sample = sample_service.get(sid)
     return SampleRead(
         id=sample.id,
@@ -320,8 +313,6 @@ async def generate_sample_ebooks(
             ebooks.append(ebook)
         except GenerationError as e:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
-
-    db.commit()
 
     return [
         EbookRead(

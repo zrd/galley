@@ -55,8 +55,6 @@ def register(
         password_hash=password_hash,
         display_name=author_in.display_name,
     )
-    db.commit()
-
     # Generate tokens
     access_token = create_access_token(author.id)
     refresh_token = create_refresh_token(author.id)

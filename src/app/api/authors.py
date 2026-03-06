@@ -46,7 +46,6 @@ def update_current_author(
 ) -> AuthorRead:
     """Update the current authenticated author's profile."""
     author = service.update(author_id, display_name=update_in.display_name)
-    db.commit()
     return AuthorRead(
         id=author.id,
         email=author.email,
