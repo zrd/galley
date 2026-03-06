@@ -7,6 +7,7 @@ import { Dashboard } from './pages/Dashboard';
 import { ManuscriptForm } from './pages/ManuscriptForm';
 import { ManuscriptDetail } from './pages/ManuscriptDetail';
 import { Ebooks } from './pages/Ebooks';
+import { Genres } from './pages/Genres';
 
 function App() {
   return (
@@ -49,6 +50,8 @@ function App() {
             </ProtectedRoute>
           }
         />
+
+        <Route path="/genres" element={<Genres />} />
 
         {/* Default redirect */}
         <Route path="/" element={<Navigate to="/dashboard" replace />} />

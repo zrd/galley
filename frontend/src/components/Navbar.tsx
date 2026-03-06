@@ -18,28 +18,36 @@ export function Navbar() {
             <Link to="/" className="text-xl font-bold text-gray-900">
               Self-Publisher
             </Link>
-            {isAuthenticated && (
-              <div className="flex space-x-4">
-                <Link
-                  to="/dashboard"
-                  className="text-gray-600 hover:text-gray-900"
-                >
-                  Manuscripts
-                </Link>
-                <Link
-                  to="/ebooks"
-                  className="text-gray-600 hover:text-gray-900"
-                >
-                  Ebooks
-                </Link>
-                <Link
-                  to="/manuscripts/new"
-                  className="text-gray-600 hover:text-gray-900"
-                >
-                  Upload
-                </Link>
-              </div>
-            )}
+            <div className="flex space-x-4">
+              <Link
+                to="/genres"
+                className="text-gray-600 hover:text-gray-900"
+              >
+                Genres
+              </Link>
+              {isAuthenticated && (
+                <>
+                  <Link
+                    to="/dashboard"
+                    className="text-gray-600 hover:text-gray-900"
+                  >
+                    Manuscripts
+                  </Link>
+                  <Link
+                    to="/ebooks"
+                    className="text-gray-600 hover:text-gray-900"
+                  >
+                    Ebooks
+                  </Link>
+                  <Link
+                    to="/manuscripts/new"
+                    className="text-gray-600 hover:text-gray-900"
+                  >
+                    Upload
+                  </Link>
+                </>
+              )}
+            </div>
           </div>
 
           <div className="flex items-center space-x-4">

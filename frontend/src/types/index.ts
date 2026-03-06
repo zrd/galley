@@ -95,6 +95,36 @@ export interface Sample {
   updated_at: string;
 }
 
+// Genre types
+export interface GenreTree {
+  id: number;
+  name: string;
+  slug: string;
+  description: string | null;
+  children: GenreTree[];
+}
+
+export interface GenreListItem {
+  id: number;
+  name: string;
+  slug: string;
+  parent_id: number | null;
+}
+
+export interface GenreRead {
+  id: number;
+  name: string;
+  slug: string;
+  description: string | null;
+  parent_id: number | null;
+}
+
+export interface GenreCreateRequest {
+  name: string;
+  description?: string;
+  parent_id?: number;
+}
+
 // API Error
 export interface ApiError {
   detail: string | { loc: string[]; msg: string; type: string }[];
