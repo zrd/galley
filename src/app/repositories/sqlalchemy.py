@@ -5,16 +5,19 @@ SQLAlchemy repository implementations for production use with PostgreSQL.
 from datetime import datetime, timezone
 from uuid import UUID
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.db.models import (
     AuthorModel,
     DownloadModel,
     EbookModel,
+    GenreModel,
     ManuscriptModel,
+    ManuscriptGenreModel,
     SampleModel,
 )
-from app.domain import Author, Download, Ebook, Manuscript, Sample
+from app.domain import Author, Download, Ebook, Genre, Manuscript, Sample
 
 
 def _author_model_to_domain(model: AuthorModel) -> Author:
@@ -34,6 +37,7 @@ def _manuscript_model_to_domain(model: ManuscriptModel) -> Manuscript:
         author_id=model.author_id,
         title=model.title,
         description=model.description,
+        genres=[_genre_model_to_domain(g) for g in model.genres],
         source_format=model.source_format,
         source_file_key=model.source_file_key,
         state=model.state,
@@ -81,6 +85,16 @@ def _download_model_to_domain(model: DownloadModel) -> Download:
         ip_hash=model.ip_hash,
         tracking_code=model.tracking_code,
         deleted_at=model.deleted_at,
+    )
+
+
+def _genre_model_to_domain(model: GenreModel) -> Genre:
+    return Genre(
+        id=model.id,
+        name=model.name,
+        slug=model.slug,
+        description=model.description,
+        parent_id=model.parent_id,
     )
 
 
@@ -216,6 +230,17 @@ class SQLAlchemyManuscriptRepository:
         if model:
             model.deleted_at = None
             self.session.flush()
+
+    def set_genres(self, manuscript_id: UUID, genre_ids: list[int]) -> None:
+        self.session.query(ManuscriptGenreModel).filter(
+            ManuscriptGenreModel.manuscript_id == manuscript_id
+        ).delete()
+
+        for genre_id in genre_ids:
+            self.session.add(
+                ManuscriptGenreModel(manuscript_id=manuscript_id, genre_id=genre_id)
+            )
+        self.session.flush()
 
 
 class SQLAlchemySampleRepository:
@@ -472,3 +497,40 @@ class SQLAlchemyDownloadRepository:
         if not include_deleted:
             query = query.filter(DownloadModel.deleted_at.is_(None))
         return query.count()
+
+
+class SQLAlchemyGenreRepository:
+    def __init__(self, session: Session) -> None:
+        self.session = session
+
+    def add(self, genre: Genre) -> Genre:
+        model = GenreModel(
+            name=genre.name,
+            slug=genre.slug,
+            description=genre.description,
+            parent_id=genre.parent_id,
+        )
+        self.session.add(model)
+        self.session.flush()
+        return _genre_model_to_domain(model)
+
+    def get(self, genre_id: int) -> Genre | None:
+        model = self.session.get(GenreModel, genre_id)
+        if model is None:
+            return None
+        return _genre_model_to_domain(model)
+
+    def list_all(self) -> list[Genre]:
+        stmt = select(GenreModel)
+        models = self.session.scalars(stmt).all()
+        return [_genre_model_to_domain(m) for m in models]
+
+    def list_by_parent(self, parent_id: int) -> list[Genre]:
+        stmt = select(GenreModel).where(GenreModel.parent_id == parent_id)
+        models = self.session.scalars(stmt).all()
+        return [_genre_model_to_domain(m) for m in models]
+
+    def list_top_level(self) -> list[Genre]:
+        stmt = select(GenreModel).where(GenreModel.parent_id.is_(None))
+        models = self.session.scalars(stmt).all()
+        return [_genre_model_to_domain(m) for m in models]

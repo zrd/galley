@@ -67,6 +67,10 @@ class ManuscriptModel(Base):
 
     # Relationships
     author: Mapped["AuthorModel"] = relationship(back_populates="manuscripts")
+    genres: Mapped[list["GenreModel"]] = relationship(
+        secondary="manuscript_genres",
+        back_populates="manuscripts"
+    )
     samples: Mapped[list["SampleModel"]] = relationship(
         back_populates="manuscript", cascade="all, delete-orphan"
     )
@@ -175,3 +179,34 @@ class DownloadModel(Base):
 
     # Relationships
     ebook: Mapped["EbookModel"] = relationship(back_populates="downloads")
+
+
+class GenreModel(Base):
+    __tablename__ = "genres"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(String(64), nullable=False)
+    slug: Mapped[str] = mapped_column(String(64), nullable=False)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    parent_id: Mapped[int | None] = mapped_column(ForeignKey("genres.id"), nullable=True)
+
+    # Relationships
+    parent: Mapped["GenreModel | None"] = relationship(
+        "GenreModel", back_populates="children", remote_side="GenreModel.id"
+    )
+    children: Mapped[list["GenreModel"]] = relationship("GenreModel", back_populates="parent")
+    manuscripts: Mapped[list["ManuscriptModel"]] = relationship(
+        secondary="manuscript_genres",
+        back_populates="genres"
+    )
+
+
+class ManuscriptGenreModel(Base):
+    __tablename__ = "manuscript_genres"
+
+    manuscript_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("manuscripts.id", ondelete="CASCADE"), primary_key=True
+    )
+    genre_id: Mapped[int] = mapped_column(
+        ForeignKey("genres.id", ondelete="CASCADE"), primary_key=True
+    )

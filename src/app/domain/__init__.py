@@ -8,11 +8,13 @@ from .exceptions import (
     AuthorNotFound,
     DomainError,
     EbookNotFound,
+    GenreNotFound,
     EntityNotFound,
     InvalidStateTransition,
     ManuscriptNotFound,
     SampleNotFound,
 )
+from .genre import Genre
 from .manuscript import Manuscript
 from .sample import Sample
 
@@ -21,6 +23,7 @@ __all__ = [
     "Author",
     "Download",
     "Ebook",
+    "Genre",
     "Manuscript",
     "Sample",
     # Enums
@@ -33,6 +36,7 @@ __all__ = [
     "AuthorNotFound",
     "DomainError",
     "EbookNotFound",
+    "GenreNotFound",
     "EntityNotFound",
     "InvalidStateTransition",
     "ManuscriptNotFound",

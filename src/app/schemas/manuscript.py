@@ -4,11 +4,13 @@ from uuid import UUID
 from pydantic import BaseModel, Field, field_validator
 
 from app.domain import ManuscriptState, SourceFormat
+from app.schemas.genre import GenreRead
 
 
 class ManuscriptCreate(BaseModel):
     title: str = Field(min_length=1)
     description: str | None = None
+    genre_ids: list[int] = []
     source_format: SourceFormat
 
     @field_validator("title")
@@ -22,6 +24,7 @@ class ManuscriptCreate(BaseModel):
 class ManuscriptUpdate(BaseModel):
     title: str | None = None
     description: str | None = None
+    genre_ids: list[int] | None = None
 
     @field_validator("title")
     @classmethod
@@ -38,6 +41,7 @@ class ManuscriptRead(BaseModel):
     author_id: UUID
     title: str
     description: str | None
+    genres: list[GenreRead]
     source_format: SourceFormat
     state: ManuscriptState
     created_at: datetime

@@ -21,6 +21,7 @@ class ManuscriptService:
         title: str,
         source_format: SourceFormat,
         source_file_key: str,
+        genre_ids: list[int] | None = None,
         description: str | None = None,
     ) -> Manuscript:
         manuscript = Manuscript(
@@ -28,9 +29,13 @@ class ManuscriptService:
             title=title,
             source_format=source_format,
             source_file_key=source_file_key,
-            description=description,
+            description=description
         )
-        return self.repo.add(manuscript)
+        created = self.repo.add(manuscript)
+        if genre_ids:
+            self.repo.set_genres(manuscript_id=created.id, genre_ids=genre_ids)
+            return self.repo.get(created.id)
+        return created
 
     def get(self, manuscript_id: UUID, *, include_deleted: bool = False) -> Manuscript:
         manuscript = self.repo.get(manuscript_id, include_deleted=include_deleted)
@@ -46,10 +51,15 @@ class ManuscriptService:
         manuscript_id: UUID,
         title: str | None = None,
         description: str | None = None,
+        genre_ids: list[int] | None = None
     ) -> Manuscript:
         manuscript = self.get(manuscript_id)
         manuscript.update_metadata(title=title, description=description)
-        return self.repo.update(manuscript)
+        updated = self.repo.update(manuscript)
+        if genre_ids is not None:
+            self.repo.set_genres(manuscript_id=updated.id, genre_ids=genre_ids)
+            return self.repo.get(updated.id)
+        return updated
 
     def update_source(
         self,

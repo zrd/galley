@@ -4,6 +4,7 @@ from uuid import UUID, uuid4
 
 from .enums import ManuscriptState, SourceFormat
 from .exceptions import InvalidStateTransition
+from .genre import Genre
 
 
 @dataclass
@@ -14,6 +15,7 @@ class Manuscript:
     source_file_key: str
     id: UUID = field(default_factory=uuid4)
     description: str | None = None
+    genres: list[Genre] = field(default_factory=list)
     state: ManuscriptState = ManuscriptState.DRAFT
     created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))

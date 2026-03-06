@@ -40,6 +40,10 @@ class EbookNotFound(EntityNotFound):
     pass
 
 
+class GenreNotFound(EntityNotFound):
+    pass
+
+
 class AuthenticationError(DomainError):
     """Raised for authentication failures."""
 

@@ -6,6 +6,7 @@ from app.api import (
     authors_router,
     debug_router,
     ebooks_router,
+    genres_router,
     health_router,
     manuscripts_router,
     samples_router,
@@ -45,6 +46,7 @@ app.include_router(authors_router, prefix="/authors", tags=["authors"])
 
 # Manuscript management
 app.include_router(manuscripts_router, prefix="/manuscripts", tags=["manuscripts"])
+app.include_router(genres_router, prefix="/genres", tags=["genres"])
 
 # Sample definitions
 app.include_router(samples_router, prefix="/samples", tags=["samples"])
