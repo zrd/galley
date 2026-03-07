@@ -50,7 +50,7 @@ async def create_manuscript(
     source_format: Annotated[SourceFormat, Form()],
     file: Annotated[UploadFile, File()],
     description: Annotated[str | None, Form()] = None,
-    genre_ids: Annotated[list[int], Form()] | None = None,
+    genre_ids: list[int] = Form(default=[]),
     service: ManuscriptService = Depends(get_manuscript_service),
     db: Session = Depends(get_db),
 ) -> ManuscriptRead:
@@ -190,6 +190,7 @@ def update_manuscript(
             mid,
             title=update_in.title,
             description=update_in.description,
+            genre_ids=update_in.genre_ids,
         )
     except ManuscriptNotFound:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Manuscript not found")
