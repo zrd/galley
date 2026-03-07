@@ -8,6 +8,7 @@ import {
   useGenerateEbook,
 } from '../hooks/useManuscripts';
 import { useEbooksByManuscript } from '../hooks/useEbooks';
+import { useGenreList } from '../hooks/useGenres';
 import { ebooksApi } from '../api/ebooks';
 import type { OutputFormat, ManuscriptState } from '../types';
 
@@ -34,15 +35,19 @@ export function ManuscriptDetail() {
   const deleteManuscript = useDeleteManuscript();
   const generateEbook = useGenerateEbook();
 
+  const { data: genres } = useGenreList();
+
   const [isEditing, setIsEditing] = useState(false);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
+  const [selectedGenreIds, setSelectedGenreIds] = useState<number[]>([]);
   const [selectedFormats, setSelectedFormats] = useState<OutputFormat[]>(['epub']);
 
   const handleEdit = () => {
     if (manuscript) {
       setTitle(manuscript.title);
       setDescription(manuscript.description || '');
+      setSelectedGenreIds(manuscript.genres.map((g) => g.id));
       setIsEditing(true);
     }
   };
@@ -51,7 +56,7 @@ export function ManuscriptDetail() {
     if (!id) return;
     await updateManuscript.mutateAsync({
       id,
-      data: { title, description: description || undefined },
+      data: { title, description: description || undefined, genre_ids: selectedGenreIds },
     });
     setIsEditing(false);
   };
@@ -142,6 +147,26 @@ export function ManuscriptDetail() {
                 className="mt-1 block w-full rounded border border-gray-300 px-3 py-2"
               />
             </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Genres</label>
+              <div className="mt-1 max-h-48 overflow-y-auto rounded border border-gray-200 p-2 space-y-1">
+                {genres?.map((genre) => (
+                  <label key={genre.id} className="flex items-center">
+                    <input
+                      type="checkbox"
+                      checked={selectedGenreIds.includes(genre.id)}
+                      onChange={() => setSelectedGenreIds((prev) =>
+                        prev.includes(genre.id)
+                          ? prev.filter((id) => id !== genre.id)
+                          : [...prev, genre.id]
+                      )}
+                      className="mr-2"
+                    />
+                    <span className="text-sm">{genre.name}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
             <div className="flex space-x-2">
               <button
                 onClick={handleSave}
@@ -193,6 +218,19 @@ export function ManuscriptDetail() {
                   {new Date(manuscript.updated_at).toLocaleString()}
                 </span>
               </div>
+            </div>
+
+            <div className="mb-4">
+              <span className="text-sm text-gray-500">Genres: </span>
+              {manuscript.genres?.length > 0 ? (
+                manuscript.genres.map((g) => (
+                  <span key={g.id} className="mr-1 inline-flex rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-800">
+                    {g.name}
+                  </span>
+                ))
+              ) : (
+                <span className="text-sm text-gray-400">None</span>
+              )}
             </div>
 
             <div className="flex flex-wrap gap-2 border-t border-gray-200 pt-4">

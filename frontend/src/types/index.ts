@@ -39,6 +39,7 @@ export interface Manuscript {
   state: ManuscriptState;
   created_at: string;
   updated_at: string;
+  genres: GenreRead[];
 }
 
 export interface ManuscriptListItem {
@@ -56,11 +57,13 @@ export interface ManuscriptCreateRequest {
   description?: string;
   source_format: SourceFormat;
   file: File;
+  genre_ids?: number[];
 }
 
 export interface ManuscriptUpdateRequest {
   title?: string;
   description?: string;
+  genre_ids?: number[];
 }
 
 // Ebook types

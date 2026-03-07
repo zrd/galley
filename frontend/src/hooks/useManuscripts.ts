@@ -27,6 +27,7 @@ export function useCreateManuscript() {
       description?: string;
       source_format: SourceFormat;
       file: File;
+      genre_ids?: number[];
     }) => manuscriptsApi.create(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['manuscripts'] });

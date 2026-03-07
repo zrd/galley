@@ -1,6 +1,7 @@
 import { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useCreateManuscript } from '../hooks/useManuscripts';
+import { useGenreList } from '../hooks/useGenres';
 import type { SourceFormat } from '../types';
 
 const SOURCE_FORMATS: { value: SourceFormat; label: string }[] = [
@@ -15,11 +16,13 @@ export function ManuscriptForm() {
   const [description, setDescription] = useState('');
   const [sourceFormat, setSourceFormat] = useState<SourceFormat>('epub');
   const [file, setFile] = useState<File | null>(null);
+  const [selectedGenreIds, setSelectedGenreIds] = useState<number[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
   const createManuscript = useCreateManuscript();
+  const { data: genres } = useGenreList();
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
@@ -49,6 +52,7 @@ export function ManuscriptForm() {
         description: description || undefined,
         source_format: sourceFormat,
         file,
+        genre_ids: selectedGenreIds,
       });
       navigate(`/manuscripts/${manuscript.id}`);
     } catch (err) {
@@ -96,6 +100,29 @@ export function ManuscriptForm() {
             rows={3}
             className="mt-1 block w-full rounded border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
           />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700">
+            Genres (optional)
+          </label>
+          <div className="mt-1 max-h-48 overflow-y-auto rounded border border-gray-200 p-2 space-y-1">
+            {genres?.map((genre) => (
+              <label key={genre.id} className="flex items-center">
+                <input
+                  type="checkbox"
+                  checked={selectedGenreIds.includes(genre.id)}
+                  onChange={() => setSelectedGenreIds((prev) =>
+                    prev.includes(genre.id)
+                      ? prev.filter((id) => id !== genre.id)
+                      : [...prev, genre.id]
+                  )}
+                  className="mr-2"
+                />
+                <span className="text-sm">{genre.name}</span>
+              </label>
+            ))}
+          </div>
         </div>
 
         <div>

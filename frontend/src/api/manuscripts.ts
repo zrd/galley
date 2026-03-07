@@ -21,6 +21,7 @@ export const manuscriptsApi = {
     description?: string;
     source_format: SourceFormat;
     file: File;
+    genre_ids?: number[];
   }): Promise<Manuscript> {
     const formData = new FormData();
     formData.append('title', data.title);
@@ -29,6 +30,9 @@ export const manuscriptsApi = {
       formData.append('description', data.description);
     }
     formData.append('file', data.file);
+    for (const id of data.genre_ids ?? []) {
+      formData.append('genre_ids', String(id));
+    }
 
     return apiClient.postFormData<Manuscript>('/manuscripts/', formData);
   },
