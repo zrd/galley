@@ -7,13 +7,15 @@ from uuid import uuid4
 import pytest
 from sqlalchemy.orm import Session
 
-from app.domain import ManuscriptNotFound, ManuscriptState, SampleNotFound, SourceFormat
+from app.domain import ManuscriptNotFound, ManuscriptState, OutputFormat, SampleNotFound, SourceFormat
 from app.repositories import (
     SQLAlchemyAuthorRepository,
+    SQLAlchemyEbookRepository,
     SQLAlchemyManuscriptRepository,
     SQLAlchemySampleRepository,
 )
-from app.services import AuthorService, ManuscriptService, SampleService
+from app.schemas.ebook import EbookUpdate
+from app.services import AuthorService, EbookService, ManuscriptService, SampleService
 
 
 class TestAuthorService:
@@ -376,3 +378,97 @@ class TestSampleService:
         assert updated.promo_footer == "Buy now!"
         # Unchanged fields stay the same
         assert updated.excerpt_start == "1"
+
+
+class TestEbookService:
+    @pytest.fixture
+    def service(self, db_session: Session) -> EbookService:
+        repo = SQLAlchemyEbookRepository(db_session)
+        return EbookService(repo)
+
+    @pytest.fixture
+    def manuscript_id(self, db_session: Session):
+        """Create an author and manuscript to attach ebooks to."""
+        author_repo = SQLAlchemyAuthorRepository(db_session)
+        author = AuthorService(author_repo).create(
+            email="ebook-service-test@example.com",
+            password_hash="hash",
+            display_name="Test Author",
+        )
+        db_session.commit()
+
+        manuscript_repo = SQLAlchemyManuscriptRepository(db_session)
+        manuscript = ManuscriptService(manuscript_repo).create(
+            author_id=author.id,
+            title="Test Book",
+            source_format=SourceFormat.EPUB,
+            source_file_key="m/test.epub",
+        )
+        db_session.commit()
+        return manuscript.id
+
+    def test_create_ebook_persists_download_filename(
+        self, service: EbookService, db_session: Session, manuscript_id
+    ):
+        ebook = service.create(
+            manuscript_id=manuscript_id,
+            output_format=OutputFormat.EPUB,
+            file_key="ebooks/test.epub",
+            file_size_bytes=2048,
+            download_filename="Test Author - Test Book.epub",
+        )
+        db_session.commit()
+
+        retrieved = service.get(ebook.id)
+        assert retrieved.download_filename == "Test Author - Test Book.epub"
+        assert retrieved.manuscript_id == manuscript_id
+
+    def test_update_price(
+        self, service: EbookService, db_session: Session, manuscript_id
+    ):
+        ebook = service.create(
+            manuscript_id=manuscript_id,
+            output_format=OutputFormat.EPUB,
+            file_key="ebooks/test-price.epub",
+            file_size_bytes=2048,
+            download_filename="Test Author - Test Book.epub",
+        )
+        db_session.commit()
+
+        service.update_price(
+            ebook=ebook,
+            update_in=EbookUpdate(list_price_cents=999, sale_price_cents=799),
+        )
+        db_session.commit()
+
+        retrieved = service.get(ebook.id)
+        assert retrieved.list_price_cents == 999
+        assert retrieved.sale_price_cents == 799
+
+    def test_update_price_partial(
+        self, service: EbookService, db_session: Session, manuscript_id
+    ):
+        ebook = service.create(
+            manuscript_id=manuscript_id,
+            output_format=OutputFormat.EPUB,
+            file_key="ebooks/test-price-partial.epub",
+            file_size_bytes=2048,
+            download_filename="Test Author - Test Book.epub",
+        )
+        service.update_price(
+            ebook=ebook,
+            update_in=EbookUpdate(list_price_cents=999),
+        )
+        db_session.commit()
+
+        ebook = service.get(ebook.id)
+        # Patch only sale price — list price must be unchanged
+        service.update_price(
+            ebook=ebook,
+            update_in=EbookUpdate(sale_price_cents=799),
+        )
+        db_session.commit()
+
+        retrieved = service.get(ebook.id)
+        assert retrieved.list_price_cents == 999
+        assert retrieved.sale_price_cents == 799

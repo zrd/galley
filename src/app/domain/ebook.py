@@ -21,6 +21,9 @@ class Ebook:
     download_filename: str
     id: UUID = field(default_factory=uuid4)
     sample_id: UUID | None = None
+    list_price_cents: int | None = None
+    sale_price_cents: int | None = None
+    price_currency: str = "USD"
     download_count: int = 0
     created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     deleted_at: datetime | None = None
@@ -28,6 +31,34 @@ class Ebook:
     @property
     def is_deleted(self) -> bool:
         return self.deleted_at is not None
+
+    @property
+    def is_sample(self) -> bool:
+        """Check if this is a sample ebook."""
+        return self.sample_id is not None
+
+    @property
+    def effective_price_cents(self) -> int:
+        if self.sale_price_cents is not None:
+            return self.sale_price_cents
+        elif self.list_price_cents is not None:
+            return self.list_price_cents
+        else:
+            return 0
+
+    @property
+    def is_free(self) -> bool:
+        return True if self.effective_price_cents == 0 else False
+
+    @property
+    def formatted_price(self) -> str:
+        price = self.effective_price_cents
+        major_currency_symbol = "$"
+        if price == 0:
+            return "Free"
+        else:
+            major, minor = divmod(price, 100)
+            return f"{major_currency_symbol}{major}.{minor:02d}"
 
     def soft_delete(self) -> None:
         self.deleted_at = datetime.now(timezone.utc)
@@ -38,7 +69,3 @@ class Ebook:
     def increment_download_count(self) -> None:
         """Increment the download counter."""
         self.download_count += 1
-
-    def is_sample(self) -> bool:
-        """Check if this is a sample ebook."""
-        return self.sample_id is not None

@@ -270,6 +270,22 @@ class TestGenerateEbooks:
 
         assert response.status_code == 404
 
+    def test_generated_ebook_has_default_prices(
+        self, client: TestClient, auth_headers: dict, ready_manuscript_id: str
+    ):
+        """Newly generated ebooks have null prices and USD currency."""
+        response = client.post(
+            f"/ebooks/manuscripts/{ready_manuscript_id}/generate",
+            headers=auth_headers,
+            json={"output_formats": ["epub"]},
+        )
+
+        assert response.status_code == 200
+        ebook = response.json()[0]
+        assert ebook["list_price_cents"] is None
+        assert ebook["sale_price_cents"] is None
+        assert ebook["price_currency"] == "USD"
+
 
 class TestDownloadEbook:
     def test_download_nonexistent_ebook(self, client: TestClient):
@@ -597,3 +613,132 @@ class TestEbookSoftDelete:
             f"/ebooks/{ebook_id}/restore", headers=attacker_headers
         )
         assert restore_response.status_code == 404
+
+
+class TestPatchEbookPrice:
+    @pytest.fixture
+    def ebook_id(
+        self, client: TestClient, auth_headers: dict, ready_manuscript_id: str
+    ) -> str:
+        response = client.post(
+            f"/ebooks/manuscripts/{ready_manuscript_id}/generate",
+            headers=auth_headers,
+            json={"output_formats": ["epub"]},
+        )
+        return response.json()[0]["id"]
+
+    def test_set_list_price(
+        self, client: TestClient, auth_headers: dict, ebook_id: str
+    ):
+        response = client.patch(
+            f"/ebooks/{ebook_id}",
+            headers=auth_headers,
+            json={"list_price_cents": 999},
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["list_price_cents"] == 999
+        assert data["sale_price_cents"] is None
+
+    def test_set_sale_price_does_not_clear_list_price(
+        self, client: TestClient, auth_headers: dict, ebook_id: str
+    ):
+        client.patch(
+            f"/ebooks/{ebook_id}", headers=auth_headers,
+            json={"list_price_cents": 999},
+        )
+        response = client.patch(
+            f"/ebooks/{ebook_id}", headers=auth_headers,
+            json={"sale_price_cents": 799},
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["list_price_cents"] == 999
+        assert data["sale_price_cents"] == 799
+
+    def test_clear_sale_price_does_not_clear_list_price(
+        self, client: TestClient, auth_headers: dict, ebook_id: str
+    ):
+        client.patch(
+            f"/ebooks/{ebook_id}", headers=auth_headers,
+            json={"list_price_cents": 999, "sale_price_cents": 799},
+        )
+        response = client.patch(
+            f"/ebooks/{ebook_id}", headers=auth_headers,
+            json={"sale_price_cents": None},
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["sale_price_cents"] is None
+        assert data["list_price_cents"] == 999
+
+    def test_list_price_zero_accepted(
+        self, client: TestClient, auth_headers: dict, ebook_id: str
+    ):
+        response = client.patch(
+            f"/ebooks/{ebook_id}", headers=auth_headers,
+            json={"list_price_cents": 0},
+        )
+
+        assert response.status_code == 200
+        assert response.json()["list_price_cents"] == 0
+
+    def test_list_price_negative_rejected(
+        self, client: TestClient, auth_headers: dict, ebook_id: str
+    ):
+        response = client.patch(
+            f"/ebooks/{ebook_id}", headers=auth_headers,
+            json={"list_price_cents": -1},
+        )
+        assert response.status_code == 422
+
+    def test_list_price_too_large_rejected(
+        self, client: TestClient, auth_headers: dict, ebook_id: str
+    ):
+        response = client.patch(
+            f"/ebooks/{ebook_id}", headers=auth_headers,
+            json={"list_price_cents": 100000},
+        )
+        assert response.status_code == 422
+
+    def test_sale_price_negative_rejected(
+        self, client: TestClient, auth_headers: dict, ebook_id: str
+    ):
+        response = client.patch(
+            f"/ebooks/{ebook_id}", headers=auth_headers,
+            json={"sale_price_cents": -1},
+        )
+        assert response.status_code == 422
+
+    def test_sale_price_too_large_rejected(
+        self, client: TestClient, auth_headers: dict, ebook_id: str
+    ):
+        response = client.patch(
+            f"/ebooks/{ebook_id}", headers=auth_headers,
+            json={"sale_price_cents": 100000},
+        )
+        assert response.status_code == 422
+
+    def test_wrong_author_returns_404(
+        self, client: TestClient, ebook_id: str
+    ):
+        import uuid
+
+        response = client.post(
+            "/auth/register",
+            json={
+                "email": f"other-{uuid.uuid4()}@example.com",
+                "password": "password",
+                "display_name": "Other Author",
+            },
+        )
+        other_headers = {"Authorization": f"Bearer {response.json()['access_token']}"}
+
+        response = client.patch(
+            f"/ebooks/{ebook_id}", headers=other_headers,
+            json={"list_price_cents": 999},
+        )
+        assert response.status_code == 404

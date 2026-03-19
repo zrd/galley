@@ -1,4 +1,4 @@
-.PHONY: run test lint db-up db-down db-migrate db-reset
+.PHONY: run test lint db-up db-down db-migrate db-revision db-reset
 
 # Start the FastAPI server
 run:
@@ -27,6 +27,10 @@ db-down:
 # Run database migrations
 db-migrate:
 	uv run alembic upgrade head
+
+# Scaffold a new migration (usage: make db-revision m="your message here")
+db-revision:
+	uv run alembic revision -m "$(m)"
 
 # Reset database (destroy and recreate)
 db-reset:

@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import BigInteger, Boolean, DateTime, Enum, ForeignKey, String, Text
+from sqlalchemy import BigInteger, Boolean, DateTime, Enum, ForeignKey, Integer, String, Text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -137,6 +137,9 @@ class EbookModel(Base):
         Enum(OutputFormat, name="output_format", values_callable=lambda x: [e.value for e in x]),
         nullable=False,
     )
+    list_price_cents: Mapped[int] = mapped_column(Integer, nullable=True)
+    sale_price_cents: Mapped[int] = mapped_column(Integer, nullable=True)
+    price_currency: Mapped[str] = mapped_column(String(64), default="USD", nullable=False)
     file_key: Mapped[str] = mapped_column(String(512), nullable=False)
     file_size_bytes: Mapped[int] = mapped_column(BigInteger, nullable=False)
     download_filename: Mapped[str] = mapped_column(String(512), nullable=False)

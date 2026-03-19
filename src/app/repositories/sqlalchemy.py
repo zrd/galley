@@ -68,6 +68,9 @@ def _ebook_model_to_domain(model: EbookModel) -> Ebook:
         manuscript_id=model.manuscript_id,
         sample_id=model.sample_id,
         output_format=model.output_format,
+        list_price_cents=model.list_price_cents,
+        sale_price_cents=model.sale_price_cents,
+        price_currency=model.price_currency,
         file_key=model.file_key,
         file_size_bytes=model.file_size_bytes,
         download_filename=model.download_filename,
@@ -340,6 +343,9 @@ class SQLAlchemyEbookRepository:
             manuscript_id=ebook.manuscript_id,
             sample_id=ebook.sample_id,
             output_format=ebook.output_format,
+            list_price_cents=ebook.list_price_cents,
+            sale_price_cents=ebook.sale_price_cents,
+            price_currency=ebook.price_currency,
             file_key=ebook.file_key,
             file_size_bytes=ebook.file_size_bytes,
             download_filename=ebook.download_filename,
@@ -393,6 +399,9 @@ class SQLAlchemyEbookRepository:
     def update(self, ebook: Ebook) -> Ebook:
         model = self.session.get(EbookModel, ebook.id)
         if model:
+            model.list_price_cents = ebook.list_price_cents
+            model.sale_price_cents = ebook.sale_price_cents
+            model.price_currency = ebook.price_currency
             model.download_count = ebook.download_count
             model.deleted_at = ebook.deleted_at
             self.session.flush()

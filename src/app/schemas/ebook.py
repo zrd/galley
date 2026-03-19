@@ -1,9 +1,20 @@
 from datetime import datetime
+from typing import Annotated
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import AfterValidator, BaseModel, Field
 
 from app.domain import OutputFormat
+
+
+def _is_valid_price(price: int | None) -> int | None:
+    if price is None:
+        return None
+
+    if 0 <= price <= 99999:
+        return price
+    else:
+        raise ValueError(f"Invalid price: {price}")
 
 
 class EbookGenerateRequest(BaseModel):
@@ -17,6 +28,9 @@ class EbookRead(BaseModel):
     manuscript_id: UUID
     sample_id: UUID | None
     output_format: OutputFormat
+    list_price_cents: int | None
+    sale_price_cents: int | None
+    price_currency: str
     file_size_bytes: int
     download_count: int
     created_at: datetime
@@ -31,7 +45,16 @@ class EbookListItem(BaseModel):
     manuscript_id: UUID
     sample_id: UUID | None
     output_format: OutputFormat
+    list_price_cents: int | None
+    sale_price_cents: int | None
+    price_currency: str
     file_size_bytes: int
     download_count: int
     created_at: datetime
     deleted_at: datetime | None = None
+
+
+class EbookUpdate(BaseModel):
+    list_price_cents: Annotated[int | None, AfterValidator(_is_valid_price)] = None
+    sale_price_cents: Annotated[int | None, AfterValidator(_is_valid_price)] = None
+    price_currency: str = "USD"

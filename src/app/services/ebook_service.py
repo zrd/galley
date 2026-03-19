@@ -2,6 +2,7 @@ from uuid import UUID
 
 from app.domain import Ebook, EbookNotFound, OutputFormat
 from app.repositories.protocols import EbookRepository
+from app.schemas.ebook import EbookUpdate
 
 
 class EbookService:
@@ -14,6 +15,7 @@ class EbookService:
         output_format: OutputFormat,
         file_key: str,
         file_size_bytes: int,
+        download_filename: str,
         sample_id: UUID | None = None,
     ) -> Ebook:
         ebook = Ebook(
@@ -21,6 +23,7 @@ class EbookService:
             output_format=output_format,
             file_key=file_key,
             file_size_bytes=file_size_bytes,
+            download_filename=download_filename,
             sample_id=sample_id,
         )
         return self.repo.add(ebook)
@@ -59,3 +62,15 @@ class EbookService:
         # Get including deleted to verify it exists
         self.get(ebook_id, include_deleted=True)
         self.repo.restore(ebook_id)
+
+    def update_price(self, ebook: Ebook, update_in: EbookUpdate) -> Ebook:
+        if "list_price_cents" in update_in.model_fields_set:
+            ebook.list_price_cents = update_in.list_price_cents
+
+        if "sale_price_cents" in update_in.model_fields_set:
+            ebook.sale_price_cents = update_in.sale_price_cents
+
+        if "price_currency" in update_in.model_fields_set:
+            ebook.price_currency = update_in.price_currency
+
+        return self.repo.update(ebook)

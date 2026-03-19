@@ -20,6 +20,7 @@ from app.repositories import (
     SQLAlchemySampleRepository,
 )
 from app.schemas import EbookGenerateRequest, EbookListItem, EbookRead
+from app.schemas.ebook import EbookUpdate
 from app.security.auth import CurrentAuthorId, OptionalAuthorId
 from app.services import AuthorService, EbookService, GenerationError, GenerationService, ManuscriptService
 from app.storage import get_content_type_for_format, get_storage_backend
@@ -67,6 +68,9 @@ def list_ebooks(
             manuscript_id=e.manuscript_id,
             sample_id=e.sample_id,
             output_format=e.output_format,
+            list_price_cents=e.list_price_cents,
+            sale_price_cents=e.sale_price_cents,
+            price_currency=e.price_currency,
             file_size_bytes=e.file_size_bytes,
             download_count=e.download_count,
             created_at=e.created_at,
@@ -103,6 +107,9 @@ def get_ebook(
         manuscript_id=ebook.manuscript_id,
         sample_id=ebook.sample_id,
         output_format=ebook.output_format,
+        list_price_cents=ebook.list_price_cents,
+        sale_price_cents=ebook.sale_price_cents,
+        price_currency=ebook.price_currency,
         file_size_bytes=ebook.file_size_bytes,
         download_count=ebook.download_count,
         created_at=ebook.created_at,
@@ -229,6 +236,9 @@ def restore_ebook(
         manuscript_id=ebook.manuscript_id,
         sample_id=ebook.sample_id,
         output_format=ebook.output_format,
+        list_price_cents=ebook.list_price_cents,
+        sale_price_cents=ebook.sale_price_cents,
+        price_currency=ebook.price_currency,
         file_size_bytes=ebook.file_size_bytes,
         download_count=ebook.download_count,
         created_at=ebook.created_at,
@@ -285,9 +295,49 @@ async def generate_ebooks(
             manuscript_id=e.manuscript_id,
             sample_id=e.sample_id,
             output_format=e.output_format,
+            list_price_cents=e.list_price_cents,
+            sale_price_cents=e.sale_price_cents,
+            price_currency=e.price_currency,
             file_size_bytes=e.file_size_bytes,
             download_count=e.download_count,
             created_at=e.created_at,
         )
         for e in ebooks
     ]
+
+
+@router.patch("/{ebook_id}", response_model=EbookRead)
+def update_ebook_price(
+    ebook_id: str,
+    update_in: EbookUpdate,
+    author_id: CurrentAuthorId,
+    manuscript_service: Annotated[ManuscriptService, Depends(get_manuscript_service)],
+    ebook_service: Annotated[EbookService, Depends(get_ebook_service)],
+) -> EbookRead:
+    try:
+        eid = UUID(ebook_id)
+    except ValueError:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ebook not found")
+
+    try:
+        ebook = ebook_service.get(eid, include_deleted=False)
+    except EbookNotFound:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ebook not found")
+
+    if not manuscript_service.check_ownership(ebook.manuscript_id, author_id, include_deleted=False):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ebook not found")
+
+    ebook_service.update_price(ebook=ebook, update_in=update_in)
+    ebook = ebook_service.get(eid)
+    return EbookRead(
+        id=ebook.id,
+        manuscript_id=ebook.manuscript_id,
+        sample_id=ebook.sample_id,
+        output_format=ebook.output_format,
+        list_price_cents=ebook.list_price_cents,
+        sale_price_cents=ebook.sale_price_cents,
+        price_currency=ebook.price_currency,
+        file_size_bytes=ebook.file_size_bytes,
+        download_count=ebook.download_count,
+        created_at=ebook.created_at,
+    )

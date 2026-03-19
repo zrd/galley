@@ -123,7 +123,7 @@ class TestEbook:
 
         assert ebook.output_format == OutputFormat.EPUB
         assert ebook.download_count == 0
-        assert not ebook.is_sample()
+        assert not ebook.is_sample
 
     def test_increment_download(self):
         from uuid import uuid4
@@ -152,7 +152,7 @@ class TestEbook:
             file_size_bytes=1024,
             download_filename="Test Author - Test Book.epub",
         )
-        assert not full_ebook.is_sample()
+        assert not full_ebook.is_sample
 
         sample_ebook = Ebook(
             manuscript_id=uuid4(),
@@ -162,4 +162,148 @@ class TestEbook:
             download_filename="Test Author - Test Book (Sample).epub",
             sample_id=uuid4(),
         )
-        assert sample_ebook.is_sample()
+        assert sample_ebook.is_sample
+
+    def test_effective_price_no_prices(self):
+        from uuid import uuid4
+
+        ebook = Ebook(
+            manuscript_id=uuid4(),
+            output_format=OutputFormat.EPUB,
+            file_key="ebooks/test.epub",
+            file_size_bytes=1024,
+            download_filename="Test Author - Test Book.epub",
+        )
+        assert ebook.effective_price_cents == 0
+
+    def test_effective_price_list_only(self):
+        from uuid import uuid4
+
+        ebook = Ebook(
+            manuscript_id=uuid4(),
+            output_format=OutputFormat.EPUB,
+            file_key="ebooks/test.epub",
+            file_size_bytes=1024,
+            download_filename="Test Author - Test Book.epub",
+            list_price_cents=999,
+        )
+        assert ebook.effective_price_cents == 999
+
+    def test_effective_price_sale_overrides_list(self):
+        from uuid import uuid4
+
+        ebook = Ebook(
+            manuscript_id=uuid4(),
+            output_format=OutputFormat.EPUB,
+            file_key="ebooks/test.epub",
+            file_size_bytes=1024,
+            download_filename="Test Author - Test Book.epub",
+            list_price_cents=999,
+            sale_price_cents=799,
+        )
+        assert ebook.effective_price_cents == 799
+
+    def test_effective_price_free_sale_overrides_list(self):
+        # sale_price=0 must not be treated as falsy and fall through to list_price
+        from uuid import uuid4
+
+        ebook = Ebook(
+            manuscript_id=uuid4(),
+            output_format=OutputFormat.EPUB,
+            file_key="ebooks/test.epub",
+            file_size_bytes=1024,
+            download_filename="Test Author - Test Book.epub",
+            list_price_cents=999,
+            sale_price_cents=0,
+        )
+        assert ebook.effective_price_cents == 0
+
+    def test_is_free_no_prices(self):
+        from uuid import uuid4
+
+        ebook = Ebook(
+            manuscript_id=uuid4(),
+            output_format=OutputFormat.EPUB,
+            file_key="ebooks/test.epub",
+            file_size_bytes=1024,
+            download_filename="Test Author - Test Book.epub",
+        )
+        assert ebook.is_free
+
+    def test_is_free_zero_list_price(self):
+        from uuid import uuid4
+
+        ebook = Ebook(
+            manuscript_id=uuid4(),
+            output_format=OutputFormat.EPUB,
+            file_key="ebooks/test.epub",
+            file_size_bytes=1024,
+            download_filename="Test Author - Test Book.epub",
+            list_price_cents=0,
+        )
+        assert ebook.is_free
+
+    def test_is_not_free_when_priced(self):
+        from uuid import uuid4
+
+        ebook = Ebook(
+            manuscript_id=uuid4(),
+            output_format=OutputFormat.EPUB,
+            file_key="ebooks/test.epub",
+            file_size_bytes=1024,
+            download_filename="Test Author - Test Book.epub",
+            list_price_cents=999,
+        )
+        assert not ebook.is_free
+
+    def test_formatted_price_free(self):
+        from uuid import uuid4
+
+        ebook = Ebook(
+            manuscript_id=uuid4(),
+            output_format=OutputFormat.EPUB,
+            file_key="ebooks/test.epub",
+            file_size_bytes=1024,
+            download_filename="Test Author - Test Book.epub",
+        )
+        assert ebook.formatted_price == "Free"
+
+    def test_formatted_price(self):
+        from uuid import uuid4
+
+        ebook = Ebook(
+            manuscript_id=uuid4(),
+            output_format=OutputFormat.EPUB,
+            file_key="ebooks/test.epub",
+            file_size_bytes=1024,
+            download_filename="Test Author - Test Book.epub",
+            list_price_cents=999,
+        )
+        assert ebook.formatted_price == "$9.99"
+
+    def test_formatted_price_zero_padding(self):
+        # Regression: 901 cents must render as $9.01 not $9.1
+        from uuid import uuid4
+
+        ebook = Ebook(
+            manuscript_id=uuid4(),
+            output_format=OutputFormat.EPUB,
+            file_key="ebooks/test.epub",
+            file_size_bytes=1024,
+            download_filename="Test Author - Test Book.epub",
+            list_price_cents=901,
+        )
+        assert ebook.formatted_price == "$9.01"
+
+    def test_formatted_price_zero_padding_pre(self):
+        from uuid import uuid4
+
+        ebook = Ebook(
+            manuscript_id=uuid4(),
+            output_format=OutputFormat.EPUB,
+            file_key="ebooks/test.epub",
+            file_size_bytes=1024,
+            download_filename="Test Author - Test Book.epub",
+            list_price_cents=91,
+        )
+        assert ebook.formatted_price == "$0.91"
