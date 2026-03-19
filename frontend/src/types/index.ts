@@ -72,6 +72,9 @@ export interface Ebook {
   manuscript_id: string;
   sample_id: string | null;
   output_format: OutputFormat;
+  list_price_cents: number | null;
+  sale_price_cents: number | null;
+  price_currency: string;
   file_size_bytes: number;
   download_count: number;
   created_at: string;
