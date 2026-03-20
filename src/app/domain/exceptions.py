@@ -44,6 +44,10 @@ class GenreNotFound(EntityNotFound):
     pass
 
 
+class TagNotFound(EntityNotFound):
+    pass
+
+
 class AuthenticationError(DomainError):
     """Raised for authentication failures."""
 

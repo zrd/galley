@@ -13,10 +13,12 @@ from .exceptions import (
     InvalidStateTransition,
     ManuscriptNotFound,
     SampleNotFound,
+    TagNotFound,
 )
 from .genre import Genre
 from .manuscript import Manuscript
 from .sample import Sample
+from .tag import Tag
 
 __all__ = [
     # Entities
@@ -26,6 +28,7 @@ __all__ = [
     "Genre",
     "Manuscript",
     "Sample",
+    "Tag",
     # Enums
     "ManuscriptState",
     "OutputFormat",
@@ -41,4 +44,5 @@ __all__ = [
     "InvalidStateTransition",
     "ManuscriptNotFound",
     "SampleNotFound",
+    "TagNotFound",
 ]

@@ -4,6 +4,8 @@ Tests for domain entities and business logic.
 
 import pytest
 
+from datetime import datetime, timezone
+
 from app.domain import (
     Author,
     Ebook,
@@ -13,7 +15,48 @@ from app.domain import (
     OutputFormat,
     Sample,
     SourceFormat,
+    Tag,
 )
+
+
+class TestTag:
+    def test_create_tag(self):
+        tag = Tag(name="Hard Sci-Fi", slug="hard-sci-fi")
+
+        assert tag.name == "Hard Sci-Fi"
+        assert tag.slug == "hard-sci-fi"
+        assert tag.id is not None
+        assert tag.deleted_at is None
+        assert not tag.is_deleted
+
+    def test_is_deleted_false_when_active(self):
+        tag = Tag(name="Cozy Mystery", slug="cozy-mystery")
+        assert not tag.is_deleted
+
+    def test_is_deleted_true_when_deleted(self):
+        tag = Tag(
+            name="Cozy Mystery",
+            slug="cozy-mystery",
+            deleted_at=datetime.now(timezone.utc),
+        )
+        assert tag.is_deleted
+
+    def test_created_at_defaults_to_now(self):
+        before = datetime.now(timezone.utc)
+        tag = Tag(name="Fantasy", slug="fantasy")
+        after = datetime.now(timezone.utc)
+
+        assert before <= tag.created_at <= after
+
+    def test_manuscript_tags_defaults_to_empty_list(self):
+        from uuid import uuid4
+        manuscript = Manuscript(
+            author_id=uuid4(),
+            title="Test Book",
+            source_format=SourceFormat.EPUB,
+            source_file_key="manuscripts/test.epub",
+        )
+        assert manuscript.tags == []
 
 
 class TestManuscript:
