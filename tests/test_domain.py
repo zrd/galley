@@ -48,6 +48,28 @@ class TestTag:
 
         assert before <= tag.created_at <= after
 
+    def test_owner_id_defaults_to_none(self):
+        tag = Tag(name="Fantasy", slug="fantasy")
+        assert tag.owner_id is None
+
+    def test_soft_delete_sets_deleted_at(self):
+        tag = Tag(name="Fantasy", slug="fantasy")
+        assert tag.deleted_at is None
+
+        tag.soft_delete()
+
+        assert tag.deleted_at is not None
+        assert tag.is_deleted
+
+    def test_restore_clears_deleted_at(self):
+        tag = Tag(name="Fantasy", slug="fantasy", deleted_at=datetime.now(timezone.utc))
+        assert tag.is_deleted
+
+        tag.restore()
+
+        assert tag.deleted_at is None
+        assert not tag.is_deleted
+
     def test_manuscript_tags_defaults_to_empty_list(self):
         from uuid import uuid4
         manuscript = Manuscript(

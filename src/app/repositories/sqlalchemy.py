@@ -5,7 +5,9 @@ SQLAlchemy repository implementations for production use with PostgreSQL.
 from datetime import datetime, timezone
 from uuid import UUID
 
-from sqlalchemy import select
+from slugify import slugify
+
+from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
 from app.db.models import (
@@ -16,8 +18,9 @@ from app.db.models import (
     ManuscriptModel,
     ManuscriptGenreModel,
     SampleModel,
+    TagModel, ManuscriptTagModel,
 )
-from app.domain import Author, Download, Ebook, Genre, Manuscript, Sample
+from app.domain import Author, Download, Ebook, Genre, Manuscript, Sample, Tag
 
 
 def _author_model_to_domain(model: AuthorModel) -> Author:
@@ -38,6 +41,7 @@ def _manuscript_model_to_domain(model: ManuscriptModel) -> Manuscript:
         title=model.title,
         description=model.description,
         genres=[_genre_model_to_domain(g) for g in model.genres],
+        tags=[_tag_model_to_domain(t) for t in model.tags],
         source_format=model.source_format,
         source_file_key=model.source_file_key,
         state=model.state,
@@ -98,6 +102,17 @@ def _genre_model_to_domain(model: GenreModel) -> Genre:
         slug=model.slug,
         description=model.description,
         parent_id=model.parent_id,
+    )
+
+
+def _tag_model_to_domain(model: TagModel) -> Tag:
+    return Tag(
+        id=model.id,
+        name=model.name,
+        slug=model.slug,
+        owner_id=model.owner_id,
+        created_at=model.created_at,
+        deleted_at=model.deleted_at,
     )
 
 
@@ -242,6 +257,18 @@ class SQLAlchemyManuscriptRepository:
         for genre_id in genre_ids:
             self.session.add(
                 ManuscriptGenreModel(manuscript_id=manuscript_id, genre_id=genre_id)
+            )
+        self.session.flush()
+
+    def set_tags(self, manuscript_id: UUID, tag_ids: list[UUID]) -> None:
+        self.session.execute(
+            delete(ManuscriptTagModel).where(
+                ManuscriptTagModel.manuscript_id == manuscript_id
+            )
+        )
+        for tag_id in tag_ids:
+            self.session.add(
+                ManuscriptTagModel(manuscript_id=manuscript_id, tag_id=tag_id)
             )
         self.session.flush()
 
@@ -543,3 +570,74 @@ class SQLAlchemyGenreRepository:
         stmt = select(GenreModel).where(GenreModel.parent_id.is_(None))
         models = self.session.scalars(stmt).all()
         return [_genre_model_to_domain(m) for m in models]
+
+
+class SQLAlchemyTagRepository:
+    def __init__(self, session: Session) -> None:
+        self.session = session
+
+    def add(self, tag: Tag) -> Tag:
+        model = TagModel(
+            id=tag.id,
+            name=tag.name,
+            slug=tag.slug,
+            owner_id=tag.owner_id,
+            created_at=tag.created_at,
+            deleted_at=tag.deleted_at,
+        )
+        self.session.add(model)
+        self.session.flush()
+        return _tag_model_to_domain(model)
+
+    def get(self, tag_id: UUID) -> Tag | None:
+        stmt = select(TagModel).where(TagModel.id == tag_id)
+        model = self.session.scalars(stmt).one_or_none()
+        if model is None:
+            return None
+        return _tag_model_to_domain(model)
+
+    def update(self, tag: Tag) -> Tag:
+        model = self.session.get(TagModel, tag.id)
+        if model:
+            model.name = tag.name
+            model.slug = tag.slug
+            model.owner_id = tag.owner_id
+            model.created_at = tag.created_at
+            model.deleted_at = tag.deleted_at
+            self.session.flush()
+            return _tag_model_to_domain(model)
+        raise ValueError(f"Tag {tag.id} not found")
+
+    def get_by_slug(self, slug: str, owner_id: UUID) -> Tag | None:
+        stmt = select(TagModel).where(TagModel.slug == slug, TagModel.owner_id == owner_id)
+        model = self.session.scalars(stmt).one_or_none()
+        if model is None:
+            return None
+        return _tag_model_to_domain(model)
+
+    def get_or_create(self, name: str, owner_id: UUID) -> Tag:
+        slug = slugify(name)
+        tag = self.get_by_slug(slug, owner_id)
+        if tag is None:
+            tag = self.add(Tag(
+                name=name,
+                slug=slug,
+                owner_id=owner_id,
+            ))
+        elif tag.is_deleted:
+            tag.restore()
+            tag = self.update(tag)
+
+        return tag
+
+    def list_popular(self, top_n: int) -> list[Tag]:
+        stmt = (
+            select(TagModel, func.count(ManuscriptTagModel.manuscript_id).label("usage_count"))
+            .join(ManuscriptTagModel, ManuscriptTagModel.tag_id == TagModel.id, isouter=True)
+            .where(TagModel.deleted_at.is_(None))
+            .group_by(TagModel.id)
+            .order_by(func.count(ManuscriptTagModel.manuscript_id).desc())
+            .limit(top_n)
+        )
+        rows = self.session.execute(stmt).all()
+        return [_tag_model_to_domain(row.TagModel) for row in rows]

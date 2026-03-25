@@ -5,6 +5,7 @@ from .protocols import (
     GenreRepository,
     ManuscriptRepository,
     SampleRepository,
+    TagRepository,
 )
 from .sqlalchemy import (
     SQLAlchemyAuthorRepository,
@@ -13,6 +14,7 @@ from .sqlalchemy import (
     SQLAlchemyGenreRepository,
     SQLAlchemyManuscriptRepository,
     SQLAlchemySampleRepository,
+    SQLAlchemyTagRepository,
 )
 
 __all__ = [
@@ -23,6 +25,7 @@ __all__ = [
     "GenreRepository",
     "ManuscriptRepository",
     "SampleRepository",
+    "TagRepository",
     # SQLAlchemy implementations
     "SQLAlchemyAuthorRepository",
     "SQLAlchemyDownloadRepository",
@@ -30,4 +33,5 @@ __all__ = [
     "SQLAlchemyGenreRepository",
     "SQLAlchemyManuscriptRepository",
     "SQLAlchemySampleRepository",
+    "SQLAlchemyTagRepository",
 ]

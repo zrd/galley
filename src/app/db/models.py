@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import BigInteger, Boolean, DateTime, Enum, ForeignKey, Integer, String, Text
+from sqlalchemy import BigInteger, Boolean, DateTime, Enum, ForeignKey, Integer, String, Text, UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -29,6 +29,9 @@ class AuthorModel(Base):
     # Relationships
     manuscripts: Mapped[list["ManuscriptModel"]] = relationship(
         back_populates="author", cascade="all, delete-orphan"
+    )
+    tags: Mapped[list["TagModel"]] = relationship(
+        back_populates="owner"
     )
 
 
@@ -69,6 +72,10 @@ class ManuscriptModel(Base):
     author: Mapped["AuthorModel"] = relationship(back_populates="manuscripts")
     genres: Mapped[list["GenreModel"]] = relationship(
         secondary="manuscript_genres",
+        back_populates="manuscripts"
+    )
+    tags: Mapped[list["TagModel"]] = relationship(
+        secondary="manuscript_tags",
         back_populates="manuscripts"
     )
     samples: Mapped[list["SampleModel"]] = relationship(
@@ -212,4 +219,44 @@ class ManuscriptGenreModel(Base):
     )
     genre_id: Mapped[int] = mapped_column(
         ForeignKey("genres.id", ondelete="CASCADE"), primary_key=True
+    )
+
+
+class TagModel(Base):
+    __tablename__ = "tags"
+    __table_args__ = (
+        UniqueConstraint("owner_id", "slug", name="uq_tags_owner_slug"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    name: Mapped[str] = mapped_column(String(128), nullable=False)
+    slug: Mapped[str] = mapped_column(String(128), nullable=False)
+    owner_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("authors.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
+    )
+    deleted_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True, default=None, index=True
+    )
+
+    # Relationships
+    manuscripts: Mapped[list["ManuscriptModel"]] = relationship(
+        secondary="manuscript_tags",
+        back_populates="tags"
+    )
+    owner: Mapped["AuthorModel | None"] = relationship(back_populates="tags")
+
+
+class ManuscriptTagModel(Base):
+    __tablename__ = "manuscript_tags"
+
+    manuscript_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("manuscripts.id", ondelete="CASCADE"), primary_key=True
+    )
+    tag_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("tags.id", ondelete="CASCADE"), primary_key=True
     )

@@ -25,9 +25,13 @@ def upgrade() -> None:
         "tags",
         sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True),
         sa.Column("name", sa.String(128), nullable=False),
-        sa.Column("slug", sa.String(128), nullable=False, unique=True),
+        sa.Column("slug", sa.String(128), nullable=False),
+        # NULL owner_id indicates a system-wide or admin-owned tag.
+        sa.Column("owner_id", postgresql.UUID(as_uuid=True), nullable=True),
         sa.Column("created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()),
         sa.Column("deleted_at", sa.DateTime(timezone=True), nullable=True),
+        sa.ForeignKeyConstraint(["owner_id"], ["authors.id"], ondelete="SET NULL"),
+        sa.UniqueConstraint("owner_id", "slug", name="uq_tags_owner_slug"),
     )
 
     op.create_table(

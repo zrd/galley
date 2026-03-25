@@ -13,6 +13,7 @@ from app.repositories import (
     SQLAlchemyEbookRepository,
     SQLAlchemyManuscriptRepository,
     SQLAlchemySampleRepository,
+    SQLAlchemyTagRepository,
 )
 from app.schemas.ebook import EbookUpdate
 from app.services import AuthorService, EbookService, ManuscriptService, SampleService
@@ -472,3 +473,247 @@ class TestEbookService:
         retrieved = service.get(ebook.id)
         assert retrieved.list_price_cents == 999
         assert retrieved.sale_price_cents == 799
+
+
+class TestTagRepository:
+    @pytest.fixture
+    def repo(self, db_session: Session) -> SQLAlchemyTagRepository:
+        return SQLAlchemyTagRepository(db_session)
+
+    @pytest.fixture
+    def author_id(self, db_session: Session):
+        author = AuthorService(SQLAlchemyAuthorRepository(db_session)).create(
+            email="tag-repo-test@example.com",
+            password_hash="hash",
+            display_name="Tag Test Author",
+        )
+        db_session.commit()
+        return author.id
+
+    @pytest.fixture
+    def other_author_id(self, db_session: Session):
+        author = AuthorService(SQLAlchemyAuthorRepository(db_session)).create(
+            email="tag-repo-other@example.com",
+            password_hash="hash",
+            display_name="Other Author",
+        )
+        db_session.commit()
+        return author.id
+
+    @pytest.fixture
+    def manuscript_id(self, db_session: Session, author_id):
+        manuscript = ManuscriptService(SQLAlchemyManuscriptRepository(db_session)).create(
+            author_id=author_id,
+            title="Test Book",
+            source_format=SourceFormat.EPUB,
+            source_file_key="m/test.epub",
+        )
+        db_session.commit()
+        return manuscript.id
+
+    def test_add_persists_tag(self, repo: SQLAlchemyTagRepository, db_session: Session, author_id):
+        from app.domain import Tag
+        tag = repo.add(Tag(name="Hard Sci-Fi", slug="hard-sci-fi", owner_id=author_id))
+        db_session.commit()
+
+        retrieved = repo.get(tag.id)
+        assert retrieved is not None
+        assert retrieved.name == "Hard Sci-Fi"
+        assert retrieved.slug == "hard-sci-fi"
+        assert retrieved.owner_id == author_id
+
+    def test_update_persists_changes(self, repo: SQLAlchemyTagRepository, db_session: Session, author_id):
+        from app.domain import Tag
+        tag = repo.add(Tag(name="Hard Sci-Fi", slug="hard-sci-fi", owner_id=author_id))
+        db_session.commit()
+
+        tag.name = "Hard Science Fiction"
+        tag.slug = "hard-science-fiction"
+        repo.update(tag)
+        db_session.commit()
+
+        retrieved = repo.get(tag.id)
+        assert retrieved.name == "Hard Science Fiction"
+        assert retrieved.slug == "hard-science-fiction"
+
+    def test_get_returns_none_for_missing(self, repo: SQLAlchemyTagRepository):
+        assert repo.get(uuid4()) is None
+
+    def test_get_by_slug_returns_tag(self, repo: SQLAlchemyTagRepository, db_session: Session, author_id):
+        from app.domain import Tag
+        repo.add(Tag(name="Cozy Mystery", slug="cozy-mystery", owner_id=author_id))
+        db_session.commit()
+
+        found = repo.get_by_slug("cozy-mystery", author_id)
+        assert found is not None
+        assert found.name == "Cozy Mystery"
+
+    def test_get_by_slug_respects_owner_scope(
+        self, repo: SQLAlchemyTagRepository, db_session: Session, author_id, other_author_id
+    ):
+        from app.domain import Tag
+        # Both authors have the same slug
+        repo.add(Tag(name="Fantasy", slug="fantasy", owner_id=author_id))
+        repo.add(Tag(name="Fantasy", slug="fantasy", owner_id=other_author_id))
+        db_session.commit()
+
+        found = repo.get_by_slug("fantasy", author_id)
+        assert found is not None
+        assert found.owner_id == author_id
+
+        found_other = repo.get_by_slug("fantasy", other_author_id)
+        assert found_other is not None
+        assert found_other.owner_id == other_author_id
+        assert found.id != found_other.id
+
+    def test_get_by_slug_returns_none_for_wrong_owner(
+        self, repo: SQLAlchemyTagRepository, db_session: Session, author_id, other_author_id
+    ):
+        from app.domain import Tag
+        repo.add(Tag(name="Thriller", slug="thriller", owner_id=author_id))
+        db_session.commit()
+
+        assert repo.get_by_slug("thriller", other_author_id) is None
+
+    def test_get_or_create_creates_new_tag(
+        self, repo: SQLAlchemyTagRepository, db_session: Session, author_id
+    ):
+        tag = repo.get_or_create("New Wave", author_id)
+        db_session.commit()
+
+        assert tag.name == "New Wave"
+        assert tag.slug == "new-wave"
+        assert tag.owner_id == author_id
+
+    def test_get_or_create_returns_existing(
+        self, repo: SQLAlchemyTagRepository, db_session: Session, author_id
+    ):
+        from app.domain import Tag
+        existing = repo.add(Tag(name="Romance", slug="romance", owner_id=author_id))
+        db_session.commit()
+
+        tag = repo.get_or_create("Romance", author_id)
+        assert tag.id == existing.id
+
+    def test_get_or_create_resurrects_soft_deleted(
+        self, repo: SQLAlchemyTagRepository, db_session: Session, author_id
+    ):
+        from app.domain import Tag
+        tag = repo.add(Tag(name="Horror", slug="horror", owner_id=author_id))
+        db_session.commit()
+
+        tag.soft_delete()
+        repo.update(tag)
+        db_session.commit()
+
+        assert repo.get(tag.id).is_deleted
+
+        resurrected = repo.get_or_create("Horror", author_id)
+        db_session.commit()
+
+        assert resurrected.id == tag.id
+        assert not resurrected.is_deleted
+
+    def test_set_tags_assigns_tags_to_manuscript(
+        self, repo: SQLAlchemyTagRepository, db_session: Session, author_id, manuscript_id
+    ):
+        from app.domain import Tag
+        ms_repo = SQLAlchemyManuscriptRepository(db_session)
+        t1 = repo.add(Tag(name="Sci-Fi", slug="sci-fi", owner_id=author_id))
+        t2 = repo.add(Tag(name="Adventure", slug="adventure", owner_id=author_id))
+        db_session.commit()
+
+        ms_repo.set_tags(manuscript_id, [t1.id, t2.id])
+        db_session.commit()
+
+        manuscript = ms_repo.get(manuscript_id)
+        tag_ids = {t.id for t in manuscript.tags}
+        assert t1.id in tag_ids
+        assert t2.id in tag_ids
+
+    def test_set_tags_replaces_existing(
+        self, repo: SQLAlchemyTagRepository, db_session: Session, author_id, manuscript_id
+    ):
+        from app.domain import Tag
+        ms_repo = SQLAlchemyManuscriptRepository(db_session)
+        t1 = repo.add(Tag(name="Sci-Fi", slug="sci-fi-replace", owner_id=author_id))
+        t2 = repo.add(Tag(name="Adventure", slug="adventure-replace", owner_id=author_id))
+        db_session.commit()
+
+        ms_repo.set_tags(manuscript_id, [t1.id])
+        db_session.commit()
+
+        ms_repo.set_tags(manuscript_id, [t2.id])
+        db_session.commit()
+
+        manuscript = ms_repo.get(manuscript_id)
+        tag_ids = {t.id for t in manuscript.tags}
+        assert t2.id in tag_ids
+        assert t1.id not in tag_ids
+
+    def test_set_tags_with_empty_list_clears_tags(
+        self, repo: SQLAlchemyTagRepository, db_session: Session, author_id, manuscript_id
+    ):
+        from app.domain import Tag
+        ms_repo = SQLAlchemyManuscriptRepository(db_session)
+        t1 = repo.add(Tag(name="Mystery", slug="mystery-clear", owner_id=author_id))
+        db_session.commit()
+
+        ms_repo.set_tags(manuscript_id, [t1.id])
+        db_session.commit()
+
+        ms_repo.set_tags(manuscript_id, [])
+        db_session.commit()
+
+        manuscript = ms_repo.get(manuscript_id)
+        assert manuscript.tags == []
+
+    def test_list_popular_orders_by_usage(
+        self, repo: SQLAlchemyTagRepository, db_session: Session, author_id
+    ):
+        from app.domain import Tag
+        ms_repo = SQLAlchemyManuscriptRepository(db_session)
+
+        t_popular = repo.add(Tag(name="Popular", slug="popular", owner_id=author_id))
+        t_rare = repo.add(Tag(name="Rare", slug="rare", owner_id=author_id))
+        db_session.commit()
+
+        for i, email in enumerate(["pop1@example.com", "pop2@example.com"]):
+            author = AuthorService(SQLAlchemyAuthorRepository(db_session)).create(
+                email=email, password_hash="hash", display_name=f"Author {i}"
+            )
+            db_session.commit()
+            m = ManuscriptService(SQLAlchemyManuscriptRepository(db_session)).create(
+                author_id=author.id,
+                title=f"Book {i}",
+                source_format=SourceFormat.EPUB,
+                source_file_key=f"m/book{i}.epub",
+            )
+            db_session.commit()
+            ms_repo.set_tags(m.id, [t_popular.id])
+            db_session.commit()
+
+        m_rare = ManuscriptService(SQLAlchemyManuscriptRepository(db_session)).create(
+            author_id=author_id,
+            title="Rare Book",
+            source_format=SourceFormat.EPUB,
+            source_file_key="m/rare.epub",
+        )
+        db_session.commit()
+        ms_repo.set_tags(m_rare.id, [t_rare.id])
+        db_session.commit()
+
+        results = repo.list_popular(top_n=2)
+        assert results[0].id == t_popular.id
+        assert results[1].id == t_rare.id
+
+    def test_list_popular_respects_top_n(
+        self, repo: SQLAlchemyTagRepository, db_session: Session, author_id
+    ):
+        from app.domain import Tag
+        for i in range(5):
+            repo.add(Tag(name=f"Tag {i}", slug=f"tag-{i}", owner_id=author_id))
+        db_session.commit()
+
+        results = repo.list_popular(top_n=3)
+        assert len(results) == 3
