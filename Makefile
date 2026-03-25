@@ -14,15 +14,15 @@ lint:
 
 # Start PostgreSQL container
 db-up:
-	docker compose up -d postgres
+	sudo docker compose up -d postgres
 	@echo "Waiting for PostgreSQL to be ready..."
 	@sleep 2
-	@docker compose exec postgres pg_isready -U postgres -d self_publishing || (echo "Database not ready" && exit 1)
+	@sudo docker compose exec postgres pg_isready -U postgres -d self_publishing || (echo "Database not ready" && exit 1)
 	@echo "PostgreSQL is ready!"
 
 # Stop PostgreSQL container
 db-down:
-	docker compose down
+	sudo docker compose down
 
 # Run database migrations
 db-migrate:
@@ -45,8 +45,8 @@ db-revision:
 
 # Reset database (destroy and recreate)
 db-reset:
-	docker compose down -v
-	docker compose up -d postgres
+	sudo docker compose down -v
+	sudo docker compose up -d postgres
 	@echo "Waiting for PostgreSQL to be ready..."
 	@sleep 3
 	uv run alembic upgrade head
