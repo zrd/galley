@@ -4,6 +4,74 @@ import { useCreateManuscript } from '../hooks/useManuscripts';
 import { useGenreList } from '../hooks/useGenres';
 import type { SourceFormat } from '../types';
 
+function TagInput({
+  tags,
+  onChange,
+}: {
+  tags: string[];
+  onChange: (tags: string[]) => void;
+}) {
+  const [input, setInput] = useState('');
+
+  const addTag = () => {
+    const trimmed = input.trim();
+    if (trimmed && !tags.includes(trimmed)) {
+      onChange([...tags, trimmed]);
+    }
+    setInput('');
+  };
+
+  const removeTag = (name: string) => {
+    onChange(tags.filter((t) => t !== name));
+  };
+
+  return (
+    <div>
+      <div className="flex gap-2">
+        <input
+          type="text"
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              addTag();
+            }
+          }}
+          placeholder="Add a tag…"
+          className="block flex-1 rounded border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+        />
+        <button
+          type="button"
+          onClick={addTag}
+          className="rounded border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+        >
+          Add
+        </button>
+      </div>
+      {tags.length > 0 && (
+        <div className="mt-2 flex flex-wrap gap-1">
+          {tags.map((tag) => (
+            <span
+              key={tag}
+              className="inline-flex items-center gap-1 rounded-full bg-purple-100 px-2 py-0.5 text-xs font-medium text-purple-800"
+            >
+              {tag}
+              <button
+                type="button"
+                onClick={() => removeTag(tag)}
+                className="text-purple-500 hover:text-purple-700"
+              >
+                &times;
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 const SOURCE_FORMATS: { value: SourceFormat; label: string }[] = [
   { value: 'epub', label: 'EPUB' },
   { value: 'pdf', label: 'PDF' },
@@ -17,6 +85,7 @@ export function ManuscriptForm() {
   const [sourceFormat, setSourceFormat] = useState<SourceFormat>('epub');
   const [file, setFile] = useState<File | null>(null);
   const [selectedGenreIds, setSelectedGenreIds] = useState<number[]>([]);
+  const [tagNames, setTagNames] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -53,6 +122,7 @@ export function ManuscriptForm() {
         source_format: sourceFormat,
         file,
         genre_ids: selectedGenreIds,
+        tag_names: tagNames,
       });
       navigate(`/manuscripts/${manuscript.id}`);
     } catch (err) {
@@ -122,6 +192,15 @@ export function ManuscriptForm() {
                 <span className="text-sm">{genre.name}</span>
               </label>
             ))}
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700">
+            Tags (optional)
+          </label>
+          <div className="mt-1">
+            <TagInput tags={tagNames} onChange={setTagNames} />
           </div>
         </div>
 

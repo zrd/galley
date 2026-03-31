@@ -8,6 +8,7 @@ import { ManuscriptForm } from './pages/ManuscriptForm';
 import { ManuscriptDetail } from './pages/ManuscriptDetail';
 import { Ebooks } from './pages/Ebooks';
 import { Genres } from './pages/Genres';
+import { Tags } from './pages/Tags';
 
 function App() {
   return (
@@ -52,6 +53,15 @@ function App() {
         />
 
         <Route path="/genres" element={<Genres />} />
+
+        <Route
+          path="/tags"
+          element={
+            <ProtectedRoute>
+              <Tags />
+            </ProtectedRoute>
+          }
+        />
 
         {/* Default redirect */}
         <Route path="/" element={<Navigate to="/dashboard" replace />} />

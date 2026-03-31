@@ -40,6 +40,12 @@ export function Navbar() {
                     Ebooks
                   </Link>
                   <Link
+                    to="/tags"
+                    className="text-gray-600 hover:text-gray-900"
+                  >
+                    Tags
+                  </Link>
+                  <Link
                     to="/manuscripts/new"
                     className="text-gray-600 hover:text-gray-900"
                   >

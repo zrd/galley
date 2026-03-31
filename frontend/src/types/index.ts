@@ -40,6 +40,7 @@ export interface Manuscript {
   created_at: string;
   updated_at: string;
   genres: GenreRead[];
+  tags: TagRead[];
 }
 
 export interface ManuscriptListItem {
@@ -58,12 +59,14 @@ export interface ManuscriptCreateRequest {
   source_format: SourceFormat;
   file: File;
   genre_ids?: number[];
+  tag_names?: string[];
 }
 
 export interface ManuscriptUpdateRequest {
   title?: string;
   description?: string;
   genre_ids?: number[];
+  tag_names?: string[];
 }
 
 // Ebook types
@@ -99,6 +102,13 @@ export interface Sample {
   promo_footer: string | null;
   created_at: string;
   updated_at: string;
+}
+
+// Tag types
+export interface TagRead {
+  id: string;
+  name: string;
+  slug: string;
 }
 
 // Genre types

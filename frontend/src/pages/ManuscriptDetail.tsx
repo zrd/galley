@@ -12,6 +12,74 @@ import { useGenreList } from '../hooks/useGenres';
 import { ebooksApi } from '../api/ebooks';
 import type { OutputFormat, ManuscriptState } from '../types';
 
+function TagInput({
+  tags,
+  onChange,
+}: {
+  tags: string[];
+  onChange: (tags: string[]) => void;
+}) {
+  const [input, setInput] = useState('');
+
+  const addTag = () => {
+    const trimmed = input.trim();
+    if (trimmed && !tags.includes(trimmed)) {
+      onChange([...tags, trimmed]);
+    }
+    setInput('');
+  };
+
+  const removeTag = (name: string) => {
+    onChange(tags.filter((t) => t !== name));
+  };
+
+  return (
+    <div>
+      <div className="flex gap-2">
+        <input
+          type="text"
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              addTag();
+            }
+          }}
+          placeholder="Add a tag…"
+          className="block flex-1 rounded border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+        />
+        <button
+          type="button"
+          onClick={addTag}
+          className="rounded border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+        >
+          Add
+        </button>
+      </div>
+      {tags.length > 0 && (
+        <div className="mt-2 flex flex-wrap gap-1">
+          {tags.map((tag) => (
+            <span
+              key={tag}
+              className="inline-flex items-center gap-1 rounded-full bg-purple-100 px-2 py-0.5 text-xs font-medium text-purple-800"
+            >
+              {tag}
+              <button
+                type="button"
+                onClick={() => removeTag(tag)}
+                className="text-purple-500 hover:text-purple-700"
+              >
+                &times;
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
@@ -41,6 +109,7 @@ export function ManuscriptDetail() {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [selectedGenreIds, setSelectedGenreIds] = useState<number[]>([]);
+  const [tagNames, setTagNames] = useState<string[]>([]);
   const [selectedFormats, setSelectedFormats] = useState<OutputFormat[]>(['epub']);
 
   const handleEdit = () => {
@@ -48,6 +117,7 @@ export function ManuscriptDetail() {
       setTitle(manuscript.title);
       setDescription(manuscript.description || '');
       setSelectedGenreIds(manuscript.genres.map((g) => g.id));
+      setTagNames(manuscript.tags.map((t) => t.name));
       setIsEditing(true);
     }
   };
@@ -56,7 +126,7 @@ export function ManuscriptDetail() {
     if (!id) return;
     await updateManuscript.mutateAsync({
       id,
-      data: { title, description: description || undefined, genre_ids: selectedGenreIds },
+      data: { title, description: description || undefined, genre_ids: selectedGenreIds, tag_names: tagNames },
     });
     setIsEditing(false);
   };
@@ -167,6 +237,12 @@ export function ManuscriptDetail() {
                 ))}
               </div>
             </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Tags</label>
+              <div className="mt-1">
+                <TagInput tags={tagNames} onChange={setTagNames} />
+              </div>
+            </div>
             <div className="flex space-x-2">
               <button
                 onClick={handleSave}
@@ -220,12 +296,25 @@ export function ManuscriptDetail() {
               </div>
             </div>
 
-            <div className="mb-4">
+            <div className="mb-2">
               <span className="text-sm text-gray-500">Genres: </span>
               {manuscript.genres?.length > 0 ? (
                 manuscript.genres.map((g) => (
                   <span key={g.id} className="mr-1 inline-flex rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-800">
                     {g.name}
+                  </span>
+                ))
+              ) : (
+                <span className="text-sm text-gray-400">None</span>
+              )}
+            </div>
+
+            <div className="mb-4">
+              <span className="text-sm text-gray-500">Tags: </span>
+              {manuscript.tags?.length > 0 ? (
+                manuscript.tags.map((t) => (
+                  <span key={t.id} className="mr-1 inline-flex rounded-full bg-purple-100 px-2 py-0.5 text-xs font-medium text-purple-800">
+                    {t.name}
                   </span>
                 ))
               ) : (
