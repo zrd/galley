@@ -596,6 +596,11 @@ class SQLAlchemyTagRepository:
             return None
         return _tag_model_to_domain(model)
 
+    def list_by_owner(self, owner_id: UUID) -> list[Tag]:
+        stmt = select(TagModel).where(TagModel.owner_id == owner_id).order_by(TagModel.name)
+        models = self.session.scalars(stmt).all()
+        return [_tag_model_to_domain(m) for m in models]
+
     def update(self, tag: Tag) -> Tag:
         model = self.session.get(TagModel, tag.id)
         if model:
@@ -638,6 +643,17 @@ class SQLAlchemyTagRepository:
             .group_by(TagModel.id)
             .order_by(func.count(ManuscriptTagModel.manuscript_id).desc())
             .limit(top_n)
+        )
+        rows = self.session.execute(stmt).all()
+        return [_tag_model_to_domain(row.TagModel) for row in rows]
+
+    def list_all_(self) -> list[Tag]:
+        stmt = (
+            select(TagModel, func.count(ManuscriptTagModel.manuscript_id).label("usage_count"))
+            .join(ManuscriptTagModel, ManuscriptTagModel.tag_id == TagModel.id, isouter=True)
+            .where(TagModel.deleted_at.is_(None))
+            .group_by(TagModel.id)
+            .order_by(func.count(ManuscriptTagModel.manuscript_id).desc())
         )
         rows = self.session.execute(stmt).all()
         return [_tag_model_to_domain(row.TagModel) for row in rows]

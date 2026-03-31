@@ -7,7 +7,7 @@ from uuid import uuid4
 import pytest
 from sqlalchemy.orm import Session
 
-from app.domain import ManuscriptNotFound, ManuscriptState, OutputFormat, SampleNotFound, SourceFormat
+from app.domain import ManuscriptNotFound, ManuscriptState, OutputFormat, SampleNotFound, SourceFormat, TagNotFound
 from app.repositories import (
     SQLAlchemyAuthorRepository,
     SQLAlchemyEbookRepository,
@@ -16,7 +16,7 @@ from app.repositories import (
     SQLAlchemyTagRepository,
 )
 from app.schemas.ebook import EbookUpdate
-from app.services import AuthorService, EbookService, ManuscriptService, SampleService
+from app.services import AuthorService, EbookService, ManuscriptService, SampleService, TagService
 
 
 class TestAuthorService:
@@ -86,7 +86,8 @@ class TestManuscriptService:
     @pytest.fixture
     def service(self, db_session: Session) -> ManuscriptService:
         repo = SQLAlchemyManuscriptRepository(db_session)
-        return ManuscriptService(repo)
+        tag_repo = SQLAlchemyTagRepository(db_session)
+        return ManuscriptService(repo, tag_repo=tag_repo)
 
     @pytest.fixture
     def author_id(self, db_session: Session):
@@ -182,6 +183,7 @@ class TestManuscriptService:
 
         updated = service.update_metadata(
             created.id,
+            author_id=author_id,
             title="Updated Title",
             description="New description",
         )
@@ -189,6 +191,63 @@ class TestManuscriptService:
 
         assert updated.title == "Updated Title"
         assert updated.description == "New description"
+
+    def test_create_with_tag_names(self, service: ManuscriptService, db_session: Session, author_id):
+        manuscript = service.create(
+            author_id=author_id,
+            title="Tagged Book",
+            source_format=SourceFormat.EPUB,
+            source_file_key="m/tagged.epub",
+            tag_names=["Hard Sci-Fi", "Adventure"],
+        )
+        db_session.commit()
+
+        assert len(manuscript.tags) == 2
+        slugs = {t.slug for t in manuscript.tags}
+        assert slugs == {"hard-sci-fi", "adventure"}
+
+    def test_update_metadata_with_tag_names(self, service: ManuscriptService, db_session: Session, author_id):
+        created = service.create(
+            author_id=author_id,
+            title="Book",
+            source_format=SourceFormat.EPUB,
+            source_file_key="m/book.epub",
+            tag_names=["Fantasy"],
+        )
+        db_session.commit()
+
+        updated = service.update_metadata(
+            created.id,
+            author_id=author_id,
+            tag_names=["Horror", "Thriller"],
+        )
+        db_session.commit()
+
+        slugs = {t.slug for t in updated.tags}
+        assert slugs == {"horror", "thriller"}
+        assert "fantasy" not in slugs
+
+    def test_update_metadata_without_tag_names_preserves_tags(
+        self, service: ManuscriptService, db_session: Session, author_id
+    ):
+        created = service.create(
+            author_id=author_id,
+            title="Book",
+            source_format=SourceFormat.EPUB,
+            source_file_key="m/book.epub",
+            tag_names=["Fantasy"],
+        )
+        db_session.commit()
+
+        updated = service.update_metadata(
+            created.id,
+            author_id=author_id,
+            title="Updated Title",
+        )
+        db_session.commit()
+
+        assert len(updated.tags) == 1
+        assert updated.tags[0].slug == "fantasy"
 
     def test_mark_ready(self, service: ManuscriptService, db_session: Session, author_id):
         created = service.create(
@@ -717,3 +776,82 @@ class TestTagRepository:
 
         results = repo.list_popular(top_n=3)
         assert len(results) == 3
+
+
+class TestTagService:
+    @pytest.fixture
+    def service(self, db_session: Session) -> TagService:
+        return TagService(SQLAlchemyTagRepository(db_session))
+
+    @pytest.fixture
+    def author_id(self, db_session: Session):
+        repo = SQLAlchemyAuthorRepository(db_session)
+        author = AuthorService(repo).create(
+            email="tag-service-test@example.com",
+            password_hash="hash",
+            display_name="Tag Test Author",
+        )
+        db_session.commit()
+        return author.id
+
+    @pytest.fixture
+    def other_author_id(self, db_session: Session):
+        repo = SQLAlchemyAuthorRepository(db_session)
+        author = AuthorService(repo).create(
+            email="other-tag-service-test@example.com",
+            password_hash="hash",
+            display_name="Other Tag Author",
+        )
+        db_session.commit()
+        return author.id
+
+    def test_create_returns_tag(self, service: TagService, db_session: Session, author_id):
+        tag = service.create(name="Hard Sci-Fi", owner_id=author_id)
+        db_session.commit()
+
+        assert tag.name == "Hard Sci-Fi"
+        assert tag.slug == "hard-sci-fi"
+        assert tag.owner_id == author_id
+
+    def test_create_is_idempotent(self, service: TagService, db_session: Session, author_id):
+        t1 = service.create(name="Hard Sci-Fi", owner_id=author_id)
+        db_session.commit()
+        t2 = service.create(name="Hard Sci-Fi", owner_id=author_id)
+        db_session.commit()
+
+        assert t1.id == t2.id
+
+    def test_get_returns_tag(self, service: TagService, db_session: Session, author_id):
+        service.create(name="Adventure", owner_id=author_id)
+        db_session.commit()
+
+        tag = service.get(name="Adventure", owner_id=author_id)
+
+        assert tag.name == "Adventure"
+        assert tag.owner_id == author_id
+
+    def test_get_raises_tag_not_found(self, service: TagService, author_id):
+        with pytest.raises(TagNotFound):
+            service.get(name="Nonexistent", owner_id=author_id)
+
+    def test_list_all_returns_owner_tags(self, service: TagService, db_session: Session, author_id):
+        service.create(name="Fantasy", owner_id=author_id)
+        service.create(name="Horror", owner_id=author_id)
+        db_session.commit()
+
+        tags = service.list_all(owner_id=author_id)
+
+        assert len(tags) == 2
+        assert {t.name for t in tags} == {"Fantasy", "Horror"}
+
+    def test_list_all_excludes_other_owners(
+        self, service: TagService, db_session: Session, author_id, other_author_id
+    ):
+        service.create(name="Fantasy", owner_id=author_id)
+        service.create(name="Horror", owner_id=other_author_id)
+        db_session.commit()
+
+        tags = service.list_all(owner_id=author_id)
+
+        assert len(tags) == 1
+        assert tags[0].name == "Fantasy"

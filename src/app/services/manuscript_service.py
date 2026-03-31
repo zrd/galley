@@ -1,7 +1,7 @@
 from uuid import UUID
 
 from app.domain import Manuscript, ManuscriptNotFound, SourceFormat
-from app.repositories.protocols import EbookRepository, ManuscriptRepository, SampleRepository
+from app.repositories.protocols import EbookRepository, ManuscriptRepository, SampleRepository, TagRepository
 
 
 class ManuscriptService:
@@ -10,10 +10,12 @@ class ManuscriptService:
         repo: ManuscriptRepository,
         sample_repo: SampleRepository | None = None,
         ebook_repo: EbookRepository | None = None,
+        tag_repo: TagRepository | None = None,
     ) -> None:
         self.repo = repo
         self.sample_repo = sample_repo
         self.ebook_repo = ebook_repo
+        self.tag_repo = tag_repo
 
     def create(
         self,
@@ -22,6 +24,7 @@ class ManuscriptService:
         source_format: SourceFormat,
         source_file_key: str,
         genre_ids: list[int] | None = None,
+        tag_names: list[str] | None = None,
         description: str | None = None,
     ) -> Manuscript:
         manuscript = Manuscript(
@@ -34,8 +37,12 @@ class ManuscriptService:
         created = self.repo.add(manuscript)
         if genre_ids:
             self.repo.set_genres(manuscript_id=created.id, genre_ids=genre_ids)
-            return self.repo.get(created.id)
-        return created
+
+        if tag_names:
+            tag_ids = [self.tag_repo.get_or_create(name=n, owner_id=author_id).id for n in tag_names]
+            self.repo.set_tags(manuscript_id=created.id, tag_ids=tag_ids)
+
+        return self.repo.get(created.id)
 
     def get(self, manuscript_id: UUID, *, include_deleted: bool = False) -> Manuscript:
         manuscript = self.repo.get(manuscript_id, include_deleted=include_deleted)
@@ -49,17 +56,23 @@ class ManuscriptService:
     def update_metadata(
         self,
         manuscript_id: UUID,
+        author_id: UUID,
         title: str | None = None,
         description: str | None = None,
-        genre_ids: list[int] | None = None
+        genre_ids: list[int] | None = None,
+        tag_names: list[str] | None = None,
     ) -> Manuscript:
         manuscript = self.get(manuscript_id)
         manuscript.update_metadata(title=title, description=description)
         updated = self.repo.update(manuscript)
         if genre_ids is not None:
             self.repo.set_genres(manuscript_id=updated.id, genre_ids=genre_ids)
-            return self.repo.get(updated.id)
-        return updated
+
+        if tag_names is not None:
+            tag_ids = [self.tag_repo.get_or_create(name=n, owner_id=author_id).id for n in tag_names]
+            self.repo.set_tags(manuscript_id=updated.id, tag_ids=tag_ids)
+
+        return self.repo.get(updated.id)
 
     def update_source(
         self,

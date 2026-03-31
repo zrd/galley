@@ -3,6 +3,7 @@ Manuscript management endpoints.
 """
 
 from typing import Annotated
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile, status
 from sqlalchemy.orm import Session
@@ -13,6 +14,7 @@ from app.repositories import (
     SQLAlchemyEbookRepository,
     SQLAlchemyManuscriptRepository,
     SQLAlchemySampleRepository,
+    SQLAlchemyTagRepository,
 )
 from app.schemas import ManuscriptCreate, ManuscriptListItem, ManuscriptRead, ManuscriptUpdate
 from app.security.auth import CurrentAuthorId
@@ -27,7 +29,8 @@ def get_manuscript_service(db: Annotated[Session, Depends(get_db)]) -> Manuscrip
     manuscript_repo = SQLAlchemyManuscriptRepository(db)
     sample_repo = SQLAlchemySampleRepository(db)
     ebook_repo = SQLAlchemyEbookRepository(db)
-    return ManuscriptService(manuscript_repo, sample_repo, ebook_repo)
+    tag_repo = SQLAlchemyTagRepository(db)
+    return ManuscriptService(manuscript_repo, sample_repo, ebook_repo, tag_repo)
 
 
 def get_sample_service(db: Annotated[Session, Depends(get_db)]) -> SampleService:
@@ -51,6 +54,7 @@ async def create_manuscript(
     file: Annotated[UploadFile, File()],
     description: Annotated[str | None, Form()] = None,
     genre_ids: list[int] = Form(default=[]),
+    tag_names: list[str] = Form(default=[]),
     service: ManuscriptService = Depends(get_manuscript_service),
     db: Session = Depends(get_db),
 ) -> ManuscriptRead:
@@ -94,6 +98,7 @@ async def create_manuscript(
         source_file_key=file_key,
         description=description,
         genre_ids=genre_ids,
+        tag_names=tag_names,
     )
     return ManuscriptRead(
         id=manuscript.id,
@@ -101,6 +106,7 @@ async def create_manuscript(
         title=manuscript.title,
         description=manuscript.description,
         genres=manuscript.genres,
+        tags=manuscript.tags,
         source_format=manuscript.source_format,
         state=manuscript.state,
         created_at=manuscript.created_at,
@@ -158,6 +164,7 @@ def get_manuscript(
         title=manuscript.title,
         description=manuscript.description,
         genres=manuscript.genres,
+        tags=manuscript.tags,
         source_format=manuscript.source_format,
         state=manuscript.state,
         created_at=manuscript.created_at,
@@ -188,9 +195,11 @@ def update_manuscript(
     try:
         manuscript = service.update_metadata(
             mid,
+            author_id,
             title=update_in.title,
             description=update_in.description,
             genre_ids=update_in.genre_ids,
+            tag_names=update_in.tag_names,
         )
     except ManuscriptNotFound:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Manuscript not found")
@@ -201,6 +210,7 @@ def update_manuscript(
         title=manuscript.title,
         description=manuscript.description,
         genres=manuscript.genres,
+        tags=manuscript.tags,
         source_format=manuscript.source_format,
         state=manuscript.state,
         created_at=manuscript.created_at,
@@ -257,6 +267,7 @@ async def update_manuscript_file(
         title=manuscript.title,
         description=manuscript.description,
         genres=manuscript.genres,
+        tags=manuscript.tags,
         source_format=manuscript.source_format,
         state=manuscript.state,
         created_at=manuscript.created_at,
@@ -295,6 +306,7 @@ def mark_manuscript_ready(
         title=manuscript.title,
         description=manuscript.description,
         genres=manuscript.genres,
+        tags=manuscript.tags,
         source_format=manuscript.source_format,
         state=manuscript.state,
         created_at=manuscript.created_at,
@@ -333,6 +345,7 @@ def archive_manuscript(
         title=manuscript.title,
         description=manuscript.description,
         genres=manuscript.genres,
+        tags=manuscript.tags,
         source_format=manuscript.source_format,
         state=manuscript.state,
         created_at=manuscript.created_at,
@@ -371,6 +384,7 @@ def unarchive_manuscript(
         title=manuscript.title,
         description=manuscript.description,
         genres=manuscript.genres,
+        tags=manuscript.tags,
         source_format=manuscript.source_format,
         state=manuscript.state,
         created_at=manuscript.created_at,
@@ -439,6 +453,7 @@ def restore_manuscript(
         title=manuscript.title,
         description=manuscript.description,
         genres=manuscript.genres,
+        tags=manuscript.tags,
         source_format=manuscript.source_format,
         state=manuscript.state,
         created_at=manuscript.created_at,

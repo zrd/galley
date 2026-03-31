@@ -4,6 +4,7 @@ from .ebook import EbookGenerateRequest, EbookListItem, EbookRead
 from .genre import GenreCreate, GenreRead, GenreListItem, GenreTree
 from .manuscript import ManuscriptCreate, ManuscriptListItem, ManuscriptRead, ManuscriptUpdate
 from .sample import SampleCreate, SampleRead, SampleUpdate
+from .tag import TagRead
 
 __all__ = [
     # Auth
@@ -32,4 +33,6 @@ __all__ = [
     "SampleCreate",
     "SampleRead",
     "SampleUpdate",
+    # Tag
+    "TagRead",
 ]
