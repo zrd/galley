@@ -5,6 +5,7 @@ from uuid import UUID
 from pydantic import AfterValidator, BaseModel, Field
 
 from app.domain import OutputFormat
+from app.domain.enums import Visibility
 
 
 def _is_valid_price(price: int | None) -> int | None:
@@ -33,7 +34,10 @@ class EbookRead(BaseModel):
     price_currency: str
     file_size_bytes: int
     download_count: int
+    visibility: Visibility
+    unlisted_download_limit: int | None
     created_at: datetime
+    published_at: datetime | None
 
 
 class EbookListItem(BaseModel):
@@ -50,7 +54,10 @@ class EbookListItem(BaseModel):
     price_currency: str
     file_size_bytes: int
     download_count: int
+    visibility: Visibility
+    unlisted_download_limit: int | None
     created_at: datetime
+    published_at: datetime | None
     deleted_at: datetime | None = None
 
 

@@ -11,7 +11,7 @@ from fastapi.responses import Response
 from sqlalchemy.orm import Session
 
 from app.db import get_db
-from app.domain import Download, EbookNotFound, ManuscriptNotFound
+from app.domain import Download, Ebook, EbookNotFound, ManuscriptNotFound
 from app.repositories import (
     SQLAlchemyAuthorRepository,
     SQLAlchemyDownloadRepository,
@@ -73,7 +73,10 @@ def list_ebooks(
             price_currency=e.price_currency,
             file_size_bytes=e.file_size_bytes,
             download_count=e.download_count,
+            visibility=e.visibility,
+            unlisted_download_limit=e.unlisted_download_limit,
             created_at=e.created_at,
+            published_at=e.published_at,
             deleted_at=e.deleted_at,
         )
         for e in ebooks
@@ -112,7 +115,10 @@ def get_ebook(
         price_currency=ebook.price_currency,
         file_size_bytes=ebook.file_size_bytes,
         download_count=ebook.download_count,
+        visibility=ebook.visibility,
+        unlisted_download_limit=ebook.unlisted_download_limit,
         created_at=ebook.created_at,
+        published_at=ebook.published_at,
     )
 
 
@@ -241,7 +247,10 @@ def restore_ebook(
         price_currency=ebook.price_currency,
         file_size_bytes=ebook.file_size_bytes,
         download_count=ebook.download_count,
+        visibility=ebook.visibility,
+        unlisted_download_limit=ebook.unlisted_download_limit,
         created_at=ebook.created_at,
+        published_at=ebook.published_at,
     )
 
 
@@ -300,7 +309,10 @@ async def generate_ebooks(
             price_currency=e.price_currency,
             file_size_bytes=e.file_size_bytes,
             download_count=e.download_count,
+            visibility=e.visibility,
+            unlisted_download_limit=e.unlisted_download_limit,
             created_at=e.created_at,
+            published_at=e.published_at,
         )
         for e in ebooks
     ]
@@ -339,5 +351,99 @@ def update_ebook_price(
         price_currency=ebook.price_currency,
         file_size_bytes=ebook.file_size_bytes,
         download_count=ebook.download_count,
+        visibility=ebook.visibility,
+        unlisted_download_limit=ebook.unlisted_download_limit,
         created_at=ebook.created_at,
+        published_at=ebook.published_at,
+    )
+
+
+def get_owned_ebook(
+    ebook_id: str,
+    author_id: CurrentAuthorId,
+    ebook_service: Annotated[EbookService, Depends(get_ebook_service)],
+    manuscript_service: Annotated[ManuscriptService, Depends(get_manuscript_service)],
+) -> Ebook:
+    try:
+        eid = UUID(ebook_id)
+    except ValueError:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ebook not found")
+
+    try:
+        ebook = ebook_service.get(eid, include_deleted=False)
+    except EbookNotFound:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ebook not found")
+
+    if not manuscript_service.check_ownership(ebook.manuscript_id, author_id, include_deleted=True):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ebook not found")
+
+    return ebook
+
+
+@router.post("/{ebook_id}/publish", response_model=EbookRead)
+def publish_ebook(
+    ebook: Annotated[Ebook, Depends(get_owned_ebook)],
+    ebook_service: Annotated[EbookService, Depends(get_ebook_service)],
+) -> EbookRead:
+    ebook = ebook_service.publish(ebook_id=ebook.id)
+    return EbookRead(
+        id=ebook.id,
+        manuscript_id=ebook.manuscript_id,
+        sample_id=ebook.sample_id,
+        output_format=ebook.output_format,
+        list_price_cents=ebook.list_price_cents,
+        sale_price_cents=ebook.sale_price_cents,
+        price_currency=ebook.price_currency,
+        file_size_bytes=ebook.file_size_bytes,
+        download_count=ebook.download_count,
+        visibility=ebook.visibility,
+        unlisted_download_limit=ebook.unlisted_download_limit,
+        created_at=ebook.created_at,
+        published_at=ebook.published_at,
+    )
+
+
+@router.post("/{ebook_id}/unlist", response_model=EbookRead)
+def unlist_ebook(
+    ebook: Annotated[Ebook, Depends(get_owned_ebook)],
+    ebook_service: Annotated[EbookService, Depends(get_ebook_service)],
+) -> EbookRead:
+    ebook = ebook_service.unlist(ebook_id=ebook.id)
+    return EbookRead(
+        id=ebook.id,
+        manuscript_id=ebook.manuscript_id,
+        sample_id=ebook.sample_id,
+        output_format=ebook.output_format,
+        list_price_cents=ebook.list_price_cents,
+        sale_price_cents=ebook.sale_price_cents,
+        price_currency=ebook.price_currency,
+        file_size_bytes=ebook.file_size_bytes,
+        download_count=ebook.download_count,
+        visibility=ebook.visibility,
+        unlisted_download_limit=ebook.unlisted_download_limit,
+        created_at=ebook.created_at,
+        published_at=ebook.published_at,
+    )
+
+
+@router.post("/{ebook_id}/make-private", response_model=EbookRead)
+def make_ebook_private(
+    ebook: Annotated[Ebook, Depends(get_owned_ebook)],
+    ebook_service: Annotated[EbookService, Depends(get_ebook_service)],
+) -> EbookRead:
+    ebook = ebook_service.make_private(ebook_id=ebook.id)
+    return EbookRead(
+        id=ebook.id,
+        manuscript_id=ebook.manuscript_id,
+        sample_id=ebook.sample_id,
+        output_format=ebook.output_format,
+        list_price_cents=ebook.list_price_cents,
+        sale_price_cents=ebook.sale_price_cents,
+        price_currency=ebook.price_currency,
+        file_size_bytes=ebook.file_size_bytes,
+        download_count=ebook.download_count,
+        visibility=ebook.visibility,
+        unlisted_download_limit=ebook.unlisted_download_limit,
+        created_at=ebook.created_at,
+        published_at=ebook.published_at,
     )

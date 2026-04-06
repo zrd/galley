@@ -16,6 +16,7 @@ from app.domain import (
     Sample,
     SourceFormat,
     Tag,
+    Visibility,
 )
 
 
@@ -372,3 +373,76 @@ class TestEbook:
             list_price_cents=91,
         )
         assert ebook.formatted_price == "$0.91"
+
+
+class TestEbookVisibility:
+    @pytest.fixture
+    def ebook(self):
+        from uuid import uuid4
+        return Ebook(
+            manuscript_id=uuid4(),
+            output_format=OutputFormat.EPUB,
+            file_key="ebooks/test.epub",
+            file_size_bytes=1024,
+            download_filename="Test Author - Test Book.epub",
+        )
+
+    def test_default_visibility_is_private(self, ebook):
+        assert ebook.visibility == Visibility.PRIVATE
+
+    def test_default_published_at_is_none(self, ebook):
+        assert ebook.published_at is None
+
+    def test_default_unlisted_download_limit_is_none(self, ebook):
+        assert ebook.unlisted_download_limit is None
+
+    def test_publish_sets_visibility(self, ebook):
+        ebook.publish()
+        assert ebook.visibility == Visibility.PUBLISHED
+
+    def test_publish_sets_published_at(self, ebook):
+        before = datetime.now(timezone.utc)
+        ebook.publish()
+        after = datetime.now(timezone.utc)
+        assert before <= ebook.published_at <= after
+
+    def test_publish_twice_does_not_reset_published_at(self, ebook):
+        ebook.publish()
+        first_published_at = ebook.published_at
+
+        ebook.make_private()
+        ebook.publish()
+
+        assert ebook.published_at == first_published_at
+
+    def test_unlist_sets_visibility(self, ebook):
+        ebook.unlist()
+        assert ebook.visibility == Visibility.UNLISTED
+
+    def test_unlist_does_not_set_published_at(self, ebook):
+        ebook.unlist()
+        assert ebook.published_at is None
+
+    def test_make_private_sets_visibility(self, ebook):
+        ebook.publish()
+        ebook.make_private()
+        assert ebook.visibility == Visibility.PRIVATE
+
+    def test_make_private_does_not_clear_published_at(self, ebook):
+        ebook.publish()
+        published_at = ebook.published_at
+        ebook.make_private()
+        assert ebook.published_at == published_at
+
+    def test_full_transition_cycle(self, ebook):
+        ebook.publish()
+        assert ebook.visibility == Visibility.PUBLISHED
+
+        ebook.unlist()
+        assert ebook.visibility == Visibility.UNLISTED
+
+        ebook.publish()
+        assert ebook.visibility == Visibility.PUBLISHED
+
+        ebook.make_private()
+        assert ebook.visibility == Visibility.PRIVATE

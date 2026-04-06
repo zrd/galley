@@ -74,3 +74,18 @@ class EbookService:
             ebook.price_currency = update_in.price_currency
 
         return self.repo.update(ebook)
+
+    def publish(self, ebook_id: UUID) -> Ebook:
+        ebook = self.get(ebook_id)
+        ebook.publish()
+        return self.repo.update(ebook)
+
+    def unlist(self, ebook_id: UUID) -> Ebook:
+        ebook = self.get(ebook_id)
+        ebook.unlist()
+        return self.repo.update(ebook)
+
+    def make_private(self, ebook_id: UUID) -> Ebook:
+        ebook = self.get(ebook_id)
+        ebook.make_private()
+        return self.repo.update(ebook)

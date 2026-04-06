@@ -742,3 +742,168 @@ class TestPatchEbookPrice:
             json={"list_price_cents": 999},
         )
         assert response.status_code == 404
+
+
+class TestEbookVisibility:
+    @pytest.fixture
+    def ebook_id(
+        self, client: TestClient, auth_headers: dict, ready_manuscript_id: str
+    ) -> str:
+        response = client.post(
+            f"/ebooks/manuscripts/{ready_manuscript_id}/generate",
+            headers=auth_headers,
+            json={"output_formats": ["epub"]},
+        )
+        return response.json()[0]["id"]
+
+    def test_new_ebook_has_private_visibility(
+        self, client: TestClient, auth_headers: dict, ebook_id: str
+    ):
+        response = client.get(f"/ebooks/{ebook_id}", headers=auth_headers)
+        assert response.json()["visibility"] == "private"
+        assert response.json()["published_at"] is None
+
+    def test_publish_sets_visibility(
+        self, client: TestClient, auth_headers: dict, ebook_id: str
+    ):
+        response = client.post(f"/ebooks/{ebook_id}/publish", headers=auth_headers)
+        assert response.status_code == 200
+        assert response.json()["visibility"] == "published"
+
+    def test_publish_sets_published_at(
+        self, client: TestClient, auth_headers: dict, ebook_id: str
+    ):
+        response = client.post(f"/ebooks/{ebook_id}/publish", headers=auth_headers)
+        assert response.json()["published_at"] is not None
+
+    def test_publish_twice_does_not_reset_published_at(
+        self, client: TestClient, auth_headers: dict, ebook_id: str
+    ):
+        first = client.post(f"/ebooks/{ebook_id}/publish", headers=auth_headers)
+        first_published_at = first.json()["published_at"].rstrip("Z")
+
+        client.post(f"/ebooks/{ebook_id}/make-private", headers=auth_headers)
+        second = client.post(f"/ebooks/{ebook_id}/publish", headers=auth_headers)
+
+        assert second.json()["published_at"].rstrip("Z") == first_published_at
+
+    def test_unlist_sets_visibility(
+        self, client: TestClient, auth_headers: dict, ebook_id: str
+    ):
+        response = client.post(f"/ebooks/{ebook_id}/unlist", headers=auth_headers)
+        assert response.status_code == 200
+        assert response.json()["visibility"] == "unlisted"
+
+    def test_make_private_sets_visibility(
+        self, client: TestClient, auth_headers: dict, ebook_id: str
+    ):
+        client.post(f"/ebooks/{ebook_id}/publish", headers=auth_headers)
+        response = client.post(f"/ebooks/{ebook_id}/make-private", headers=auth_headers)
+        assert response.status_code == 200
+        assert response.json()["visibility"] == "private"
+
+    def test_publish_wrong_owner_returns_404(
+        self, client: TestClient, ebook_id: str
+    ):
+        import uuid
+        response = client.post(
+            "/auth/register",
+            json={
+                "email": f"attacker-vis-{uuid.uuid4()}@example.com",
+                "password": "password",
+                "display_name": "Attacker",
+            },
+        )
+        attacker_headers = {"Authorization": f"Bearer {response.json()['access_token']}"}
+        assert client.post(f"/ebooks/{ebook_id}/publish", headers=attacker_headers).status_code == 404
+
+    def test_unlist_wrong_owner_returns_404(
+        self, client: TestClient, ebook_id: str
+    ):
+        import uuid
+        response = client.post(
+            "/auth/register",
+            json={
+                "email": f"attacker-vis-{uuid.uuid4()}@example.com",
+                "password": "password",
+                "display_name": "Attacker",
+            },
+        )
+        attacker_headers = {"Authorization": f"Bearer {response.json()['access_token']}"}
+        assert client.post(f"/ebooks/{ebook_id}/unlist", headers=attacker_headers).status_code == 404
+
+    def test_make_private_wrong_owner_returns_404(
+        self, client: TestClient, ebook_id: str
+    ):
+        import uuid
+        response = client.post(
+            "/auth/register",
+            json={
+                "email": f"attacker-vis-{uuid.uuid4()}@example.com",
+                "password": "password",
+                "display_name": "Attacker",
+            },
+        )
+        attacker_headers = {"Authorization": f"Bearer {response.json()['access_token']}"}
+        assert client.post(f"/ebooks/{ebook_id}/make-private", headers=attacker_headers).status_code == 404
+
+    def test_publish_deleted_ebook_returns_404(
+        self, client: TestClient, auth_headers: dict, ebook_id: str
+    ):
+        client.delete(f"/ebooks/{ebook_id}", headers=auth_headers)
+        response = client.post(f"/ebooks/{ebook_id}/publish", headers=auth_headers)
+        assert response.status_code == 404
+
+    def test_publish_malformed_uuid(self, client: TestClient, auth_headers: dict):
+        assert client.post("/ebooks/not-a-uuid/publish", headers=auth_headers).status_code == 404
+
+    def test_unlist_malformed_uuid(self, client: TestClient, auth_headers: dict):
+        assert client.post("/ebooks/not-a-uuid/unlist", headers=auth_headers).status_code == 404
+
+    def test_make_private_malformed_uuid(self, client: TestClient, auth_headers: dict):
+        assert client.post("/ebooks/not-a-uuid/make-private", headers=auth_headers).status_code == 404
+
+    def test_publish_requires_auth(self, client: TestClient, ebook_id: str):
+        assert client.post(f"/ebooks/{ebook_id}/publish").status_code == 401
+
+    def test_unlist_requires_auth(self, client: TestClient, ebook_id: str):
+        assert client.post(f"/ebooks/{ebook_id}/unlist").status_code == 401
+
+    def test_make_private_requires_auth(self, client: TestClient, ebook_id: str):
+        assert client.post(f"/ebooks/{ebook_id}/make-private").status_code == 401
+
+    def test_book_fair_scenario(
+        self, client: TestClient, auth_headers: dict, ready_manuscript_id: str
+    ):
+        """Two ebooks under the same manuscript can have independent visibility."""
+        paid = client.post(
+            f"/ebooks/manuscripts/{ready_manuscript_id}/generate",
+            headers=auth_headers,
+            json={"output_formats": ["epub"]},
+        ).json()[0]["id"]
+
+        free = client.post(
+            f"/ebooks/manuscripts/{ready_manuscript_id}/generate",
+            headers=auth_headers,
+            json={"output_formats": ["epub"]},
+        ).json()[0]["id"]
+
+        client.post(f"/ebooks/{paid}/publish", headers=auth_headers)
+        client.post(f"/ebooks/{free}/unlist", headers=auth_headers)
+
+        assert client.get(f"/ebooks/{paid}", headers=auth_headers).json()["visibility"] == "published"
+        assert client.get(f"/ebooks/{free}", headers=auth_headers).json()["visibility"] == "unlisted"
+
+    def test_cannot_change_visibility_after_manuscript_deleted(
+        self, client: TestClient, auth_headers: dict, ready_manuscript_id: str
+    ):
+        """Soft-deleting a manuscript cascades to its ebooks; deleted ebooks cannot be modified."""
+        ebook_id = client.post(
+            f"/ebooks/manuscripts/{ready_manuscript_id}/generate",
+            headers=auth_headers,
+            json={"output_formats": ["epub"]},
+        ).json()[0]["id"]
+
+        client.delete(f"/manuscripts/{ready_manuscript_id}", headers=auth_headers)
+
+        assert client.post(f"/ebooks/{ebook_id}/publish", headers=auth_headers).status_code == 404

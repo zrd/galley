@@ -2,7 +2,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from uuid import UUID, uuid4
 
-from .enums import OutputFormat
+from .enums import OutputFormat, Visibility
 
 
 @dataclass
@@ -25,7 +25,10 @@ class Ebook:
     sale_price_cents: int | None = None
     price_currency: str = "USD"
     download_count: int = 0
+    visibility: Visibility = Visibility.PRIVATE
+    unlisted_download_limit: int | None  = None     # Max downloads when UNLISTED (None = unlimited)
     created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    published_at: datetime | None = None            # Set when first published, never reset
     deleted_at: datetime | None = None
 
     @property
@@ -69,3 +72,14 @@ class Ebook:
     def increment_download_count(self) -> None:
         """Increment the download counter."""
         self.download_count += 1
+
+    def publish(self):
+        self.visibility = Visibility.PUBLISHED
+        if self.published_at is None:
+            self.published_at = datetime.now(timezone.utc)
+
+    def unlist(self):
+        self.visibility = Visibility.UNLISTED
+
+    def make_private(self):
+        self.visibility = Visibility.PRIVATE

@@ -2,6 +2,7 @@
 export type ManuscriptState = 'draft' | 'ready' | 'archived';
 export type SourceFormat = 'epub' | 'pdf' | 'docx' | 'odt';
 export type OutputFormat = 'epub' | 'pdf';
+export type Visibility = 'private' | 'unlisted' | 'published';
 
 // Auth types
 export interface LoginRequest {
@@ -80,6 +81,9 @@ export interface Ebook {
   price_currency: string;
   file_size_bytes: number;
   download_count: number;
+  visibility: Visibility;
+  unlisted_download_limit: number | null;
+  published_at: string | null;
   created_at: string;
 }
 

@@ -1,7 +1,7 @@
 from .author import Author
 from .download import Download
 from .ebook import Ebook
-from .enums import ManuscriptState, OutputFormat, SourceFormat
+from .enums import ManuscriptState, OutputFormat, SourceFormat, Visibility
 from .exceptions import (
     AuthenticationError,
     AuthorizationError,
@@ -33,6 +33,7 @@ __all__ = [
     "ManuscriptState",
     "OutputFormat",
     "SourceFormat",
+    "Visibility",
     # Exceptions
     "AuthenticationError",
     "AuthorizationError",

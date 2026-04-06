@@ -79,7 +79,10 @@ def _ebook_model_to_domain(model: EbookModel) -> Ebook:
         file_size_bytes=model.file_size_bytes,
         download_filename=model.download_filename,
         download_count=model.download_count,
+        visibility=model.visibility,
+        unlisted_download_limit=model.unlisted_download_limit,
         created_at=model.created_at,
+        published_at=model.published_at,
         deleted_at=model.deleted_at,
     )
 
@@ -377,7 +380,10 @@ class SQLAlchemyEbookRepository:
             file_size_bytes=ebook.file_size_bytes,
             download_filename=ebook.download_filename,
             download_count=ebook.download_count,
+            visibility=ebook.visibility,
+            unlisted_download_limit=ebook.unlisted_download_limit,
             created_at=ebook.created_at,
+            published_at=ebook.published_at,
             deleted_at=ebook.deleted_at,
         )
         self.session.add(model)
@@ -430,6 +436,9 @@ class SQLAlchemyEbookRepository:
             model.sale_price_cents = ebook.sale_price_cents
             model.price_currency = ebook.price_currency
             model.download_count = ebook.download_count
+            model.visibility = ebook.visibility
+            model.unlisted_download_limit = ebook.unlisted_download_limit
+            model.published_at = ebook.published_at
             model.deleted_at = ebook.deleted_at
             self.session.flush()
             return _ebook_model_to_domain(model)

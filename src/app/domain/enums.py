@@ -17,3 +17,9 @@ class SourceFormat(str, Enum):
 class OutputFormat(str, Enum):
     EPUB = "epub"
     PDF = "pdf"
+
+
+class Visibility(str, Enum):
+    PRIVATE = "private"         # Only author can see
+    UNLISTED = "unlisted"       # Accessible via direct link, not in store
+    PUBLISHED = "published"     # Visible in store

@@ -5,7 +5,7 @@ from sqlalchemy import BigInteger, Boolean, DateTime, Enum, ForeignKey, Integer,
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.domain.enums import ManuscriptState, OutputFormat, SourceFormat
+from app.domain.enums import ManuscriptState, OutputFormat, SourceFormat, Visibility
 
 from .base import Base
 
@@ -151,9 +151,16 @@ class EbookModel(Base):
     file_size_bytes: Mapped[int] = mapped_column(BigInteger, nullable=False)
     download_filename: Mapped[str] = mapped_column(String(512), nullable=False)
     download_count: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0)
+    visibility: Mapped[Visibility] = mapped_column(
+        Enum(Visibility, name="ebook_visibility", values_callable=lambda x: [e.value for e in x]),
+        nullable=False,
+        server_default="private",
+    )
+    unlisted_download_limit: Mapped[int | None] = mapped_column(Integer, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
     )
+    published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     deleted_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True, default=None, index=True
     )
