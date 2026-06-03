@@ -6,6 +6,7 @@ from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile, status
+from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
 from app.db import get_db
@@ -19,7 +20,7 @@ from app.repositories import (
 from app.schemas import ManuscriptCreate, ManuscriptListItem, ManuscriptRead, ManuscriptUpdate
 from app.security.auth import CurrentAuthorId
 from app.services import EbookService, ManuscriptService, SampleService
-from app.storage import generate_file_key, get_content_type_for_format, get_storage_backend
+from app.storage import generate_file_key, get_content_type_for_format, get_storage_backend, validate_image
 
 router = APIRouter()
 
@@ -107,6 +108,7 @@ async def create_manuscript(
         description=manuscript.description,
         genres=manuscript.genres,
         tags=manuscript.tags,
+        cover_image_key=manuscript.cover_image_key,
         source_format=manuscript.source_format,
         state=manuscript.state,
         created_at=manuscript.created_at,
@@ -128,6 +130,7 @@ def list_manuscripts(
             title=m.title,
             state=m.state,
             source_format=m.source_format,
+            cover_image_key=m.cover_image_key,
             created_at=m.created_at,
             updated_at=m.updated_at,
             deleted_at=m.deleted_at,
@@ -165,6 +168,7 @@ def get_manuscript(
         description=manuscript.description,
         genres=manuscript.genres,
         tags=manuscript.tags,
+        cover_image_key=manuscript.cover_image_key,
         source_format=manuscript.source_format,
         state=manuscript.state,
         created_at=manuscript.created_at,
@@ -211,6 +215,7 @@ def update_manuscript(
         description=manuscript.description,
         genres=manuscript.genres,
         tags=manuscript.tags,
+        cover_image_key=manuscript.cover_image_key,
         source_format=manuscript.source_format,
         state=manuscript.state,
         created_at=manuscript.created_at,
@@ -268,10 +273,138 @@ async def update_manuscript_file(
         description=manuscript.description,
         genres=manuscript.genres,
         tags=manuscript.tags,
+        cover_image_key=manuscript.cover_image_key,
         source_format=manuscript.source_format,
         state=manuscript.state,
         created_at=manuscript.created_at,
         updated_at=manuscript.updated_at,
+    )
+
+
+@router.put("/{manuscript_id}/cover", response_model=ManuscriptRead, status_code=status.HTTP_200_OK)
+async def upload_cover(
+    manuscript_id: UUID,
+    author_id: CurrentAuthorId,
+    file: Annotated[UploadFile, File()],
+    service: ManuscriptService = Depends(get_manuscript_service),
+    db: Session = Depends(get_db),
+) -> ManuscriptRead:
+    """
+    Upload a new cover image.
+
+    The image file should be in one of the supported formats:
+    - JPEG (.jpg, jpeg)
+    - PNG (.png)
+    """
+    if not service.check_ownership(manuscript_id, author_id):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Manuscript not found")
+
+    try:
+        manuscript = service.get(manuscript_id)
+    except ManuscriptNotFound:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Manuscript not found")
+
+    content = await file.read()
+    if len(content) == 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="File is empty",
+        )
+    try:
+        content_type = validate_image(content)
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+    format_extension = {"image/jpeg": "jpg", "image/png": "png"}[content_type]
+    if file.filename:
+        extension = file.filename.split(".")[-1]
+        if extension.lower() != format_extension:
+            file.filename = file.filename + f".{format_extension}"
+
+    filename = file.filename or f"cover.{format_extension}"
+    file_key = generate_file_key(author_id, filename, "covers")
+
+    storage = get_storage_backend()
+    await storage.upload(file_key, content, content_type)
+    existing_cover = manuscript.cover_image_key
+    updated = service.update_cover(manuscript_id, file_key)
+    if existing_cover:
+        try:
+            await storage.delete(existing_cover)
+        except Exception as e:
+            print(f"This is where I'd put my WARN: {e}\nlog, if I had one")
+
+    return ManuscriptRead(
+        id=updated.id,
+        author_id=updated.author_id,
+        title=updated.title,
+        description=updated.description,
+        genres=updated.genres,
+        tags=updated.tags,
+        cover_image_key=updated.cover_image_key,
+        source_format=updated.source_format,
+        state=updated.state,
+        created_at=updated.created_at,
+        updated_at=updated.updated_at,
+    )
+
+
+@router.get("/{manuscript_id}/cover", response_class=FileResponse, status_code=status.HTTP_200_OK)
+async def get_cover(
+    manuscript_id: UUID,
+    service: ManuscriptService = Depends(get_manuscript_service),
+    db: Session = Depends(get_db),
+) -> FileResponse:
+    try:
+        manuscript = service.get(manuscript_id)
+    except ManuscriptNotFound:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Manuscript not found")
+
+    if manuscript.cover_image_key:
+        storage = get_storage_backend()
+        asset_path = await storage.get_url(manuscript.cover_image_key)
+        media_type = get_content_type_for_format(asset_path.split(".")[-1])
+        return FileResponse(asset_path, media_type=media_type)
+
+    raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Cover not found")
+
+
+@router.delete("/{manuscript_id}/cover", response_model=ManuscriptRead, status_code=status.HTTP_200_OK)
+async def delete_cover(
+    manuscript_id: UUID,
+    author_id: CurrentAuthorId,
+    service: ManuscriptService = Depends(get_manuscript_service),
+    db: Session = Depends(get_db),
+) -> ManuscriptRead:
+    if not service.check_ownership(manuscript_id, author_id):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Manuscript not found")
+
+    try:
+        manuscript = service.get(manuscript_id)
+        existing_cover = manuscript.cover_image_key
+        updated = service.remove_cover(manuscript_id)
+    except ManuscriptNotFound:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Manuscript not found")
+
+    storage = get_storage_backend()
+    if existing_cover:
+        try:
+            await storage.delete(existing_cover)
+        except Exception as e:
+            print(f"This is where I'd put my WARN: {e}\nlog, if I had one")
+
+    return ManuscriptRead(
+        id=updated.id,
+        author_id=updated.author_id,
+        title=updated.title,
+        description=updated.description,
+        genres=updated.genres,
+        tags=updated.tags,
+        cover_image_key=updated.cover_image_key,
+        source_format=updated.source_format,
+        state=updated.state,
+        created_at=updated.created_at,
+        updated_at=updated.updated_at,
     )
 
 
@@ -307,6 +440,7 @@ def mark_manuscript_ready(
         description=manuscript.description,
         genres=manuscript.genres,
         tags=manuscript.tags,
+        cover_image_key=manuscript.cover_image_key,
         source_format=manuscript.source_format,
         state=manuscript.state,
         created_at=manuscript.created_at,
@@ -346,6 +480,7 @@ def archive_manuscript(
         description=manuscript.description,
         genres=manuscript.genres,
         tags=manuscript.tags,
+        cover_image_key=manuscript.cover_image_key,
         source_format=manuscript.source_format,
         state=manuscript.state,
         created_at=manuscript.created_at,
@@ -385,6 +520,7 @@ def unarchive_manuscript(
         description=manuscript.description,
         genres=manuscript.genres,
         tags=manuscript.tags,
+        cover_image_key=manuscript.cover_image_key,
         source_format=manuscript.source_format,
         state=manuscript.state,
         created_at=manuscript.created_at,
@@ -454,6 +590,7 @@ def restore_manuscript(
         description=manuscript.description,
         genres=manuscript.genres,
         tags=manuscript.tags,
+        cover_image_key=manuscript.cover_image_key,
         source_format=manuscript.source_format,
         state=manuscript.state,
         created_at=manuscript.created_at,

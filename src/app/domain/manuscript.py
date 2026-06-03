@@ -18,6 +18,7 @@ class Manuscript:
     description: str | None = None
     genres: list[Genre] = field(default_factory=list)
     tags: list[Tag] = field(default_factory=list)
+    cover_image_key: str | None = None
     state: ManuscriptState = ManuscriptState.DRAFT
     created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
@@ -83,3 +84,11 @@ class Manuscript:
 
     def _touch(self) -> None:
         self.updated_at = datetime.now(timezone.utc)
+
+    def set_cover(self, key: str) -> None:
+        self.cover_image_key = key
+        self._touch()
+
+    def remove_cover(self) -> None:
+        self.cover_image_key = None
+        self._touch()

@@ -78,5 +78,31 @@ def get_content_type_for_format(format_str: str) -> str:
         "pdf": "application/pdf",
         "docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
         "odt": "application/vnd.oasis.opendocument.text",
+        "jpg": "image/jpeg",
+        "png": "image/png",
     }
     return content_types.get(format_str.lower(), "application/octet-stream")
+
+
+def validate_image(content: bytes, size_limit_mb: float = 5) -> str:
+    """
+    Validate an image by type (JPEG, PNG) and size
+
+    Args:
+        content: The image data
+        size_limit_mb: The maximum allowed image size, in MB
+
+    Returns:
+        The MIME content type
+    """
+    if len(content) > size_limit_mb * 1024 * 1024:
+        raise ValueError(f"Image content size limit exceeded ({size_limit_mb:g} MB)")
+
+    if content[:3] == b"\xff\xd8\xff":
+        content_type = "image/jpeg"
+    elif content[:8] == b"\x89PNG\r\n\x1a\n":
+        content_type = "image/png"
+    else:
+        raise ValueError("Image content type not in (JPEG, PNG)")
+
+    return content_type

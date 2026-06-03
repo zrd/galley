@@ -1,7 +1,7 @@
 from datetime import datetime
 from uuid import UUID
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, computed_field
 
 from app.domain import ManuscriptState, SourceFormat
 from app.schemas.genre import GenreRead
@@ -62,10 +62,19 @@ class ManuscriptRead(BaseModel):
     description: str | None
     genres: list[GenreRead]
     tags: list[TagRead]
+    cover_image_key: str | None
     source_format: SourceFormat
     state: ManuscriptState
     created_at: datetime
     updated_at: datetime
+
+    @computed_field
+    @property
+    def cover_image_url(self) -> str | None:
+        if self.cover_image_key is None:
+            return None
+
+        return f"/manuscripts/{self.id}/cover"
 
 
 class ManuscriptListItem(BaseModel):
@@ -79,4 +88,13 @@ class ManuscriptListItem(BaseModel):
     source_format: SourceFormat
     created_at: datetime
     updated_at: datetime
+    cover_image_key: str | None = None
     deleted_at: datetime | None = None
+
+    @computed_field
+    @property
+    def cover_image_url(self) -> str | None:
+        if self.cover_image_key is None:
+            return None
+
+        return f"/manuscripts/{self.id}/cover"

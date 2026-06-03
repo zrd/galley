@@ -133,3 +133,13 @@ class ManuscriptService:
     def check_ownership(self, manuscript_id: UUID, author_id: UUID, *, include_deleted: bool = False) -> bool:
         manuscript = self.repo.get(manuscript_id, include_deleted=include_deleted)
         return manuscript is not None and manuscript.author_id == author_id
+
+    def update_cover(self, manuscript_id: UUID, cover_image_key: str) -> Manuscript:
+        manuscript = self.get(manuscript_id)
+        manuscript.set_cover(cover_image_key)
+        return self.repo.update(manuscript)
+
+    def remove_cover(self, manuscript_id: UUID) -> Manuscript:
+        manuscript = self.get(manuscript_id)
+        manuscript.remove_cover()
+        return self.repo.update(manuscript)

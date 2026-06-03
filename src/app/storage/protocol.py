@@ -68,3 +68,18 @@ class StorageBackend(Protocol):
             FileNotFoundError: If the file does not exist
         """
         ...
+
+    async def get_url(self, key: str) -> str:
+        """
+        Get the URL for a filesystem asset.
+
+        Args:
+            key: The storage key/path for the file
+
+        Returns:
+            The URL where the HTTP server can find the asset
+
+        Raises:
+            FileNotFoundError: If the file does not exist
+        """
+        ...

@@ -44,6 +44,7 @@ def _manuscript_model_to_domain(model: ManuscriptModel) -> Manuscript:
         tags=[_tag_model_to_domain(t) for t in model.tags],
         source_format=model.source_format,
         source_file_key=model.source_file_key,
+        cover_image_key=model.cover_image_key,
         state=model.state,
         created_at=model.created_at,
         updated_at=model.updated_at,
@@ -193,6 +194,7 @@ class SQLAlchemyManuscriptRepository:
             description=manuscript.description,
             source_format=manuscript.source_format,
             source_file_key=manuscript.source_file_key,
+            cover_image_key=manuscript.cover_image_key,
             state=manuscript.state,
             created_at=manuscript.created_at,
             updated_at=manuscript.updated_at,
@@ -227,6 +229,7 @@ class SQLAlchemyManuscriptRepository:
             model.description = manuscript.description
             model.source_format = manuscript.source_format
             model.source_file_key = manuscript.source_file_key
+            model.cover_image_key = manuscript.cover_image_key
             model.state = manuscript.state
             model.updated_at = manuscript.updated_at
             model.deleted_at = manuscript.deleted_at

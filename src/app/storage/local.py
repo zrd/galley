@@ -5,7 +5,6 @@ This implementation stores files on the local filesystem, mimicking
 the interface of cloud storage services like S3.
 """
 
-import os
 from pathlib import Path
 
 import aiofiles
@@ -103,5 +102,14 @@ class LocalStorageBackend:
             ".pdf": "application/pdf",
             ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
             ".odt": "application/vnd.oasis.opendocument.text",
+            ".jpg": "image/jpeg",
+            ".png": "image/png",
         }
         return content_types.get(ext, "application/octet-stream")
+
+    async def get_url(self, key: str) -> str:
+        local_path = self._get_full_path(key)
+        if local_path.exists():
+            return str(local_path)
+        else:
+            raise FileNotFoundError(key)

@@ -2,10 +2,16 @@
 Integration tests for manuscript API endpoints.
 """
 
+import asyncio
 import io
+from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
+
+from app.storage import LocalStorageBackend
+
+RESOURCES = Path(__file__).parent / "resources"
 
 
 @pytest.fixture
@@ -905,3 +911,374 @@ class TestArchiveManuscript:
         """Unarchive with malformed UUID should return 404."""
         response = client.post("/manuscripts/not-a-uuid/unarchive", headers=auth_headers)
         assert response.status_code == 404
+
+
+@pytest.fixture
+def sample_jpeg() -> bytes:
+    return (RESOURCES / "sample.jpg").read_bytes()
+
+
+@pytest.fixture
+def sample_png() -> bytes:
+    return (RESOURCES / "sample.png").read_bytes()
+
+
+@pytest.fixture
+def manuscript_id(client: TestClient, auth_headers: dict, sample_epub: bytes) -> str:
+    response = client.post(
+        "/manuscripts/",
+        headers=auth_headers,
+        data={"title": "Cover Test Book", "source_format": "epub"},
+        files={"file": ("book.epub", io.BytesIO(sample_epub), "application/epub+zip")},
+    )
+    assert response.status_code == 201
+    return response.json()["id"]
+
+
+class TestUploadCover:
+    def test_upload_jpeg_cover(
+        self, client: TestClient, auth_headers: dict, manuscript_id: str, sample_jpeg: bytes
+    ):
+        response = client.put(
+            f"/manuscripts/{manuscript_id}/cover",
+            headers=auth_headers,
+            files={"file": ("cover.jpg", io.BytesIO(sample_jpeg), "image/jpeg")},
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["cover_image_key"] is not None
+        assert data["cover_image_url"] == f"/manuscripts/{manuscript_id}/cover"
+
+    def test_upload_png_cover(
+        self, client: TestClient, auth_headers: dict, manuscript_id: str, sample_png: bytes
+    ):
+        response = client.put(
+            f"/manuscripts/{manuscript_id}/cover",
+            headers=auth_headers,
+            files={"file": ("cover.png", io.BytesIO(sample_png), "image/png")},
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["cover_image_key"] is not None
+        assert data["cover_image_url"] == f"/manuscripts/{manuscript_id}/cover"
+
+    def test_upload_cover_key_ends_with_correct_extension(
+        self, client: TestClient, auth_headers: dict, manuscript_id: str, sample_jpeg: bytes
+    ):
+        response = client.put(
+            f"/manuscripts/{manuscript_id}/cover",
+            headers=auth_headers,
+            files={"file": ("cover.jpg", io.BytesIO(sample_jpeg), "image/jpeg")},
+        )
+        assert response.status_code == 200
+        assert response.json()["cover_image_key"].endswith(".jpg")
+
+    def test_upload_cover_wrong_extension_gets_correct_appended(
+        self, client: TestClient, auth_headers: dict, manuscript_id: str, sample_jpeg: bytes
+    ):
+        """JPEG bytes with .bmp extension should have .jpg appended to the key."""
+        response = client.put(
+            f"/manuscripts/{manuscript_id}/cover",
+            headers=auth_headers,
+            files={"file": ("cover.bmp", io.BytesIO(sample_jpeg), "image/jpeg")},
+        )
+        assert response.status_code == 200
+        assert response.json()["cover_image_key"].endswith(".jpg")
+
+    def test_upload_cover_no_extension_gets_correct_extension(
+        self, client: TestClient, auth_headers: dict, manuscript_id: str, sample_jpeg: bytes
+    ):
+        """File with no extension should get .jpg appended."""
+        response = client.put(
+            f"/manuscripts/{manuscript_id}/cover",
+            headers=auth_headers,
+            files={"file": ("coverart", io.BytesIO(sample_jpeg), "image/jpeg")},
+        )
+        assert response.status_code == 200
+        assert response.json()["cover_image_key"].endswith(".jpg")
+
+    def test_upload_cover_dotted_filename_no_extension_gets_correct_extension(
+        self, client: TestClient, auth_headers: dict, manuscript_id: str, sample_jpeg: bytes
+    ):
+        """Multi-part filename with wrong final segment gets correct extension appended."""
+        response = client.put(
+            f"/manuscripts/{manuscript_id}/cover",
+            headers=auth_headers,
+            files={"file": ("cover.final.final", io.BytesIO(sample_jpeg), "image/jpeg")},
+        )
+        assert response.status_code == 200
+        assert response.json()["cover_image_key"].endswith(".jpg")
+
+    def test_upload_cover_stores_file(
+        self,
+        client: TestClient,
+        auth_headers: dict,
+        manuscript_id: str,
+        sample_jpeg: bytes,
+        test_storage: LocalStorageBackend,
+    ):
+        response = client.put(
+            f"/manuscripts/{manuscript_id}/cover",
+            headers=auth_headers,
+            files={"file": ("cover.jpg", io.BytesIO(sample_jpeg), "image/jpeg")},
+        )
+        key = response.json()["cover_image_key"]
+        assert asyncio.run(test_storage.exists(key))
+
+    def test_upload_cover_replaces_old_and_deletes_from_storage(
+        self,
+        client: TestClient,
+        auth_headers: dict,
+        manuscript_id: str,
+        sample_jpeg: bytes,
+        test_storage: LocalStorageBackend,
+    ):
+        r1 = client.put(
+            f"/manuscripts/{manuscript_id}/cover",
+            headers=auth_headers,
+            files={"file": ("cover.jpg", io.BytesIO(sample_jpeg), "image/jpeg")},
+        )
+        old_key = r1.json()["cover_image_key"]
+
+        r2 = client.put(
+            f"/manuscripts/{manuscript_id}/cover",
+            headers=auth_headers,
+            files={"file": ("cover2.jpg", io.BytesIO(sample_jpeg), "image/jpeg")},
+        )
+        assert r2.status_code == 200
+        new_key = r2.json()["cover_image_key"]
+
+        assert new_key != old_key
+        assert not asyncio.run(test_storage.exists(old_key))
+        assert asyncio.run(test_storage.exists(new_key))
+
+    def test_upload_cover_not_found(
+        self, client: TestClient, auth_headers: dict, sample_jpeg: bytes
+    ):
+        fake_id = "00000000-0000-0000-0000-000000000000"
+        response = client.put(
+            f"/manuscripts/{fake_id}/cover",
+            headers=auth_headers,
+            files={"file": ("cover.jpg", io.BytesIO(sample_jpeg), "image/jpeg")},
+        )
+        assert response.status_code == 404
+
+    def test_upload_cover_wrong_owner(
+        self, client: TestClient, manuscript_id: str, sample_jpeg: bytes
+    ):
+        import uuid as uuid_mod
+        other = client.post(
+            "/auth/register",
+            json={
+                "email": f"other-cover-{uuid_mod.uuid4()}@example.com",
+                "password": "password",
+                "display_name": "Other",
+            },
+        )
+        other_headers = {"Authorization": f"Bearer {other.json()['access_token']}"}
+        response = client.put(
+            f"/manuscripts/{manuscript_id}/cover",
+            headers=other_headers,
+            files={"file": ("cover.jpg", io.BytesIO(sample_jpeg), "image/jpeg")},
+        )
+        assert response.status_code == 404
+
+    def test_upload_cover_no_auth(
+        self, client: TestClient, manuscript_id: str, sample_jpeg: bytes
+    ):
+        response = client.put(
+            f"/manuscripts/{manuscript_id}/cover",
+            files={"file": ("cover.jpg", io.BytesIO(sample_jpeg), "image/jpeg")},
+        )
+        assert response.status_code == 401
+
+    def test_upload_cover_empty_file(
+        self, client: TestClient, auth_headers: dict, manuscript_id: str
+    ):
+        response = client.put(
+            f"/manuscripts/{manuscript_id}/cover",
+            headers=auth_headers,
+            files={"file": ("cover.jpg", io.BytesIO(b""), "image/jpeg")},
+        )
+        assert response.status_code == 400
+        assert "empty" in response.json()["detail"].lower()
+
+    def test_upload_cover_exceeds_size_limit(
+        self, client: TestClient, auth_headers: dict, manuscript_id: str
+    ):
+        oversized = b"x" * (5 * 1024 * 1024 + 1)
+        response = client.put(
+            f"/manuscripts/{manuscript_id}/cover",
+            headers=auth_headers,
+            files={"file": ("cover.jpg", io.BytesIO(oversized), "image/jpeg")},
+        )
+        assert response.status_code == 400
+        assert "5" in response.json()["detail"]
+
+    def test_upload_cover_invalid_format(
+        self, client: TestClient, auth_headers: dict, manuscript_id: str
+    ):
+        """Non-image bytes should be rejected with a clear error."""
+        pdf_bytes = b"%PDF-1.4 fake pdf content"
+        response = client.put(
+            f"/manuscripts/{manuscript_id}/cover",
+            headers=auth_headers,
+            files={"file": ("cover.pdf", io.BytesIO(pdf_bytes), "application/pdf")},
+        )
+        assert response.status_code == 400
+        detail = response.json()["detail"]
+        assert "JPEG" in detail or "PNG" in detail
+
+
+class TestGetCover:
+    def test_get_cover_jpeg(
+        self, client: TestClient, auth_headers: dict, manuscript_id: str, sample_jpeg: bytes
+    ):
+        client.put(
+            f"/manuscripts/{manuscript_id}/cover",
+            headers=auth_headers,
+            files={"file": ("cover.jpg", io.BytesIO(sample_jpeg), "image/jpeg")},
+        )
+        response = client.get(f"/manuscripts/{manuscript_id}/cover", headers=auth_headers)
+        assert response.status_code == 200
+        assert response.headers["content-type"] == "image/jpeg"
+        assert response.content == sample_jpeg
+
+    def test_get_cover_png(
+        self, client: TestClient, auth_headers: dict, manuscript_id: str, sample_png: bytes
+    ):
+        client.put(
+            f"/manuscripts/{manuscript_id}/cover",
+            headers=auth_headers,
+            files={"file": ("cover.png", io.BytesIO(sample_png), "image/png")},
+        )
+        response = client.get(f"/manuscripts/{manuscript_id}/cover", headers=auth_headers)
+        assert response.status_code == 200
+        assert response.headers["content-type"] == "image/png"
+        assert response.content == sample_png
+
+    def test_get_cover_no_cover(
+        self, client: TestClient, auth_headers: dict, manuscript_id: str
+    ):
+        response = client.get(f"/manuscripts/{manuscript_id}/cover", headers=auth_headers)
+        assert response.status_code == 404
+        assert "cover" in response.json()["detail"].lower()
+
+    def test_get_cover_not_found(self, client: TestClient, auth_headers: dict):
+        fake_id = "00000000-0000-0000-0000-000000000000"
+        response = client.get(f"/manuscripts/{fake_id}/cover", headers=auth_headers)
+        assert response.status_code == 404
+
+    def test_get_cover_wrong_owner(
+        self, client: TestClient, auth_headers: dict, manuscript_id: str, sample_jpeg: bytes
+    ):
+        import uuid as uuid_mod
+        client.put(
+            f"/manuscripts/{manuscript_id}/cover",
+            headers=auth_headers,
+            files={"file": ("cover.jpg", io.BytesIO(sample_jpeg), "image/jpeg")},
+        )
+        other = client.post(
+            "/auth/register",
+            json={
+                "email": f"other-get-cover-{uuid_mod.uuid4()}@example.com",
+                "password": "password",
+                "display_name": "Other",
+            },
+        )
+        other_headers = {"Authorization": f"Bearer {other.json()['access_token']}"}
+        response = client.get(f"/manuscripts/{manuscript_id}/cover", headers=other_headers)
+        assert response.status_code == 404
+
+    def test_get_cover_no_auth(
+        self, client: TestClient, auth_headers: dict, manuscript_id: str, sample_jpeg: bytes
+    ):
+        client.put(
+            f"/manuscripts/{manuscript_id}/cover",
+            headers=auth_headers,
+            files={"file": ("cover.jpg", io.BytesIO(sample_jpeg), "image/jpeg")},
+        )
+        response = client.get(f"/manuscripts/{manuscript_id}/cover")
+        assert response.status_code == 401
+
+
+class TestDeleteCover:
+    def test_delete_cover_success(
+        self,
+        client: TestClient,
+        auth_headers: dict,
+        manuscript_id: str,
+        sample_jpeg: bytes,
+        test_storage: LocalStorageBackend,
+    ):
+        r = client.put(
+            f"/manuscripts/{manuscript_id}/cover",
+            headers=auth_headers,
+            files={"file": ("cover.jpg", io.BytesIO(sample_jpeg), "image/jpeg")},
+        )
+        key = r.json()["cover_image_key"]
+
+        response = client.delete(f"/manuscripts/{manuscript_id}/cover", headers=auth_headers)
+        assert response.status_code == 200
+        data = response.json()
+        assert data["cover_image_key"] is None
+        assert data["cover_image_url"] is None
+        assert not asyncio.run(test_storage.exists(key))
+
+    def test_delete_cover_when_no_cover_set(
+        self, client: TestClient, auth_headers: dict, manuscript_id: str
+    ):
+        """Deleting when no cover is set should return 200 with null key."""
+        response = client.delete(f"/manuscripts/{manuscript_id}/cover", headers=auth_headers)
+        assert response.status_code == 200
+        assert response.json()["cover_image_key"] is None
+
+    def test_delete_cover_cover_not_accessible_after(
+        self, client: TestClient, auth_headers: dict, manuscript_id: str, sample_jpeg: bytes
+    ):
+        client.put(
+            f"/manuscripts/{manuscript_id}/cover",
+            headers=auth_headers,
+            files={"file": ("cover.jpg", io.BytesIO(sample_jpeg), "image/jpeg")},
+        )
+        client.delete(f"/manuscripts/{manuscript_id}/cover", headers=auth_headers)
+
+        response = client.get(f"/manuscripts/{manuscript_id}/cover", headers=auth_headers)
+        assert response.status_code == 404
+
+    def test_delete_cover_not_found(self, client: TestClient, auth_headers: dict):
+        fake_id = "00000000-0000-0000-0000-000000000000"
+        response = client.delete(f"/manuscripts/{fake_id}/cover", headers=auth_headers)
+        assert response.status_code == 404
+
+    def test_delete_cover_wrong_owner(
+        self, client: TestClient, auth_headers: dict, manuscript_id: str, sample_jpeg: bytes
+    ):
+        import uuid as uuid_mod
+        client.put(
+            f"/manuscripts/{manuscript_id}/cover",
+            headers=auth_headers,
+            files={"file": ("cover.jpg", io.BytesIO(sample_jpeg), "image/jpeg")},
+        )
+        other = client.post(
+            "/auth/register",
+            json={
+                "email": f"other-del-cover-{uuid_mod.uuid4()}@example.com",
+                "password": "password",
+                "display_name": "Other",
+            },
+        )
+        other_headers = {"Authorization": f"Bearer {other.json()['access_token']}"}
+        response = client.delete(f"/manuscripts/{manuscript_id}/cover", headers=other_headers)
+        assert response.status_code == 404
+
+    def test_delete_cover_no_auth(
+        self, client: TestClient, auth_headers: dict, manuscript_id: str, sample_jpeg: bytes
+    ):
+        client.put(
+            f"/manuscripts/{manuscript_id}/cover",
+            headers=auth_headers,
+            files={"file": ("cover.jpg", io.BytesIO(sample_jpeg), "image/jpeg")},
+        )
+        response = client.delete(f"/manuscripts/{manuscript_id}/cover")
+        assert response.status_code == 401

@@ -51,6 +51,7 @@ class ManuscriptModel(Base):
         nullable=False,
     )
     source_file_key: Mapped[str] = mapped_column(String(512), nullable=False)
+    cover_image_key: Mapped[str | None] = mapped_column(Text, nullable=True)
     state: Mapped[ManuscriptState] = mapped_column(
         Enum(ManuscriptState, name="manuscript_state", values_callable=lambda x: [e.value for e in x]),
         nullable=False,
