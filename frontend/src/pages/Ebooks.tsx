@@ -69,6 +69,7 @@ export function Ebooks() {
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
+                <th className="w-16 px-4 py-3" />
                 <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
                   Manuscript
                 </th>
@@ -90,9 +91,24 @@ export function Ebooks() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200 bg-white">
-              {ebooks?.map((ebook) => (
+              {ebooks?.map((ebook) => {
+                const manuscript = manuscripts?.find((m) => m.id === ebook.manuscript_id);
+                return (
                 <tr key={ebook.id} className="hover:bg-gray-50">
-                  <td className="whitespace-nowrap px-6 py-4">
+                  <td className="px-4 py-2 align-middle">
+                    {manuscript?.cover_image_url ? (
+                      <div className="h-24 w-16 overflow-hidden rounded shadow-sm">
+                        <img
+                          src={`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'}${manuscript.cover_image_url}?t=${manuscript.updated_at}`}
+                          alt=""
+                          className="h-full w-full object-cover"
+                        />
+                      </div>
+                    ) : (
+                      <div className="h-24 w-16 rounded bg-gray-100" />
+                    )}
+                  </td>
+                  <td className="whitespace-nowrap px-6 py-2 align-middle">
                     <Link
                       to={`/manuscripts/${ebook.manuscript_id}`}
                       className="font-medium text-blue-600 hover:underline"
@@ -103,21 +119,21 @@ export function Ebooks() {
                       <span className="ml-2 text-xs text-gray-500">(Sample)</span>
                     )}
                   </td>
-                  <td className="whitespace-nowrap px-6 py-4">
+                  <td className="whitespace-nowrap px-6 py-2 align-middle">
                     <span className="inline-flex rounded bg-gray-100 px-2 py-1 text-xs font-semibold text-gray-800">
                       {formatLabels[ebook.output_format]}
                     </span>
                   </td>
-                  <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-600">
+                  <td className="whitespace-nowrap px-6 py-2 align-middle text-sm text-gray-600">
                     {formatBytes(ebook.file_size_bytes)}
                   </td>
-                  <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-600">
+                  <td className="whitespace-nowrap px-6 py-2 align-middle text-sm text-gray-600">
                     {ebook.download_count}
                   </td>
-                  <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-600">
+                  <td className="whitespace-nowrap px-6 py-2 align-middle text-sm text-gray-600">
                     {new Date(ebook.created_at).toLocaleDateString()}
                   </td>
-                  <td className="whitespace-nowrap px-6 py-4 text-right text-sm">
+                  <td className="whitespace-nowrap px-6 py-2 align-middle text-right text-sm">
                     <a
                       href={ebooksApi.getDownloadUrl(ebook.id)}
                       className="rounded bg-blue-600 px-3 py-1 text-white hover:bg-blue-700"
@@ -127,7 +143,8 @@ export function Ebooks() {
                     </a>
                   </td>
                 </tr>
-              ))}
+                );
+              })}
             </tbody>
           </table>
         </div>

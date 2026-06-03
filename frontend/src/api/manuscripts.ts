@@ -87,4 +87,26 @@ export const manuscriptsApi = {
   async restore(id: string): Promise<Manuscript> {
     return apiClient.post<Manuscript>(`/manuscripts/${id}/restore`);
   },
+
+  async uploadCover(id: string, file: File): Promise<Manuscript> {
+    const formData = new FormData();
+    formData.append('file', file);
+    const response = await fetch(
+      `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'}/manuscripts/${id}/cover`,
+      {
+        method: 'PUT',
+        headers: { Authorization: `Bearer ${localStorage.getItem('access_token')}` },
+        body: formData,
+      }
+    );
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({}));
+      throw new Error((data as { detail?: string }).detail ?? 'Failed to upload cover');
+    }
+    return response.json();
+  },
+
+  async deleteCover(id: string): Promise<Manuscript> {
+    return apiClient.delete<Manuscript>(`/manuscripts/${id}/cover`);
+  },
 };

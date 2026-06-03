@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import {
   useManuscript,
@@ -10,6 +10,7 @@ import {
 import { useEbooksByManuscript } from '../hooks/useEbooks';
 import { useGenreList } from '../hooks/useGenres';
 import { ebooksApi } from '../api/ebooks';
+import { manuscriptsApi } from '../api/manuscripts';
 import type { OutputFormat, ManuscriptState } from '../types';
 
 function TagInput({
@@ -96,7 +97,7 @@ export function ManuscriptDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
 
-  const { data: manuscript, isLoading, error } = useManuscript(id!);
+  const { data: manuscript, isLoading, error, refetch } = useManuscript(id!);
   const { data: ebooks, isLoading: ebooksLoading } = useEbooksByManuscript(id!);
   const updateManuscript = useUpdateManuscript();
   const markReady = useMarkReady();
@@ -111,6 +112,11 @@ export function ManuscriptDetail() {
   const [selectedGenreIds, setSelectedGenreIds] = useState<number[]>([]);
   const [tagNames, setTagNames] = useState<string[]>([]);
   const [selectedFormats, setSelectedFormats] = useState<OutputFormat[]>(['epub']);
+
+  const coverFileInputRef = useRef<HTMLInputElement>(null);
+  const [isUploadingCover, setIsUploadingCover] = useState(false);
+  const [isDeletingCover, setIsDeletingCover] = useState(false);
+  const [coverError, setCoverError] = useState<string | null>(null);
 
   const handleEdit = () => {
     if (manuscript) {
@@ -154,6 +160,51 @@ export function ManuscriptDetail() {
       alert(`Generated ${ebooks.length} ebook(s) successfully!`);
     } catch {
       alert('Failed to generate ebook. Make sure the manuscript is in READY state.');
+    }
+  };
+
+  const handleCoverFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !id) return;
+    setIsUploadingCover(true);
+    setCoverError(null);
+    try {
+      await manuscriptsApi.uploadCover(id, file);
+      await refetch();
+    } catch (err) {
+      setCoverError(err instanceof Error ? err.message : 'Failed to upload cover');
+    } finally {
+      setIsUploadingCover(false);
+      if (coverFileInputRef.current) coverFileInputRef.current.value = '';
+    }
+  };
+
+  const handleDownloadCover = async () => {
+    if (!manuscript?.cover_image_url) return;
+    const url = `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'}${manuscript?.cover_image_url}`;
+    const response = await fetch(url, {
+      headers: { Authorization: `Bearer ${localStorage.getItem('access_token')}` },
+    });
+    const blob = await response.blob();
+    const objectUrl = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = objectUrl;
+    a.download = `${manuscript?.title}-cover`;
+    a.click();
+    URL.revokeObjectURL(objectUrl);
+  };
+
+  const handleDeleteCover = async () => {
+    if (!id || !window.confirm('Remove this cover image?')) return;
+    setIsDeletingCover(true);
+    setCoverError(null);
+    try {
+      await manuscriptsApi.deleteCover(id);
+      await refetch();
+    } catch (err) {
+      setCoverError(err instanceof Error ? err.message : 'Failed to remove cover');
+    } finally {
+      setIsDeletingCover(false);
     }
   };
 
@@ -320,6 +371,56 @@ export function ManuscriptDetail() {
               ) : (
                 <span className="text-sm text-gray-400">None</span>
               )}
+            </div>
+
+            <div className="mb-4">
+              <span className="block text-sm font-medium text-gray-700 mb-2">Cover Image</span>
+              {manuscript.cover_image_url ? (
+                <div className="flex items-start gap-4">
+                  <img
+                    src={`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'}${manuscript.cover_image_url}?t=${manuscript.updated_at}`}
+                    alt="Cover"
+                    className="h-40 w-auto rounded border border-gray-200 shadow-sm object-cover"
+                  />
+                  <div className="flex flex-col gap-2">
+                    <button
+                      type="button"
+                      onClick={handleDownloadCover}
+                      className="rounded border border-gray-300 px-3 py-1 text-center text-sm hover:bg-gray-50"
+                    >
+                      Download
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleDeleteCover}
+                      disabled={isDeletingCover}
+                      className="rounded border border-red-300 px-3 py-1 text-sm text-red-600 hover:bg-red-50 disabled:opacity-50"
+                    >
+                      {isDeletingCover ? 'Removing…' : 'Remove'}
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <p className="text-sm text-gray-400">No cover image</p>
+              )}
+              <div className="mt-2 flex items-center gap-3">
+                <input
+                  ref={coverFileInputRef}
+                  type="file"
+                  accept=".jpg,.jpeg,.png"
+                  onChange={handleCoverFileChange}
+                  className="hidden"
+                />
+                <button
+                  type="button"
+                  onClick={() => coverFileInputRef.current?.click()}
+                  disabled={isUploadingCover}
+                  className="rounded border border-gray-300 bg-white px-3 py-1 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                >
+                  {isUploadingCover ? 'Uploading…' : manuscript.cover_image_url ? 'Replace Cover' : 'Upload Cover'}
+                </button>
+                {coverError && <span className="text-sm text-red-600">{coverError}</span>}
+              </div>
             </div>
 
             <div className="flex flex-wrap gap-2 border-t border-gray-200 pt-4">

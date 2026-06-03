@@ -38,6 +38,8 @@ export interface Manuscript {
   description: string | null;
   source_format: SourceFormat;
   state: ManuscriptState;
+  cover_image_key: string | null;
+  cover_image_url: string | null;
   created_at: string;
   updated_at: string;
   genres: GenreRead[];
@@ -49,6 +51,8 @@ export interface ManuscriptListItem {
   title: string;
   state: ManuscriptState;
   source_format: SourceFormat;
+  cover_image_key: string | null;
+  cover_image_url: string | null;
   created_at: string;
   updated_at: string;
   deleted_at: string | null;

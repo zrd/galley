@@ -1,6 +1,7 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useCreateManuscript } from '../hooks/useManuscripts';
+import { manuscriptsApi } from '../api/manuscripts';
 import { useGenreList } from '../hooks/useGenres';
 import type { SourceFormat } from '../types';
 
@@ -86,12 +87,37 @@ export function ManuscriptForm() {
   const [file, setFile] = useState<File | null>(null);
   const [selectedGenreIds, setSelectedGenreIds] = useState<number[]>([]);
   const [tagNames, setTagNames] = useState<string[]>([]);
+  const [coverFile, setCoverFile] = useState<File | null>(null);
+  const [coverPreviewUrl, setCoverPreviewUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const coverInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    return () => {
+      if (coverPreviewUrl) URL.revokeObjectURL(coverPreviewUrl);
+    };
+  }, [coverPreviewUrl]);
+
   const navigate = useNavigate();
   const createManuscript = useCreateManuscript();
   const { data: genres } = useGenreList();
+
+  const handleCoverChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const selected = e.target.files?.[0];
+    if (!selected) return;
+    if (coverPreviewUrl) URL.revokeObjectURL(coverPreviewUrl);
+    setCoverFile(selected);
+    setCoverPreviewUrl(URL.createObjectURL(selected));
+  };
+
+  const removeCover = () => {
+    setCoverFile(null);
+    if (coverPreviewUrl) URL.revokeObjectURL(coverPreviewUrl);
+    setCoverPreviewUrl(null);
+    if (coverInputRef.current) coverInputRef.current.value = '';
+  };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
@@ -124,6 +150,13 @@ export function ManuscriptForm() {
         genre_ids: selectedGenreIds,
         tag_names: tagNames,
       });
+      try {
+        if (coverFile) {
+          await manuscriptsApi.uploadCover(manuscript.id, coverFile);
+        }
+      } catch {
+        // Cover upload failed; navigate anyway — user can re-upload from the detail page
+      }
       navigate(`/manuscripts/${manuscript.id}`);
     } catch (err) {
       setError('Failed to create manuscript. Please try again.');
@@ -201,6 +234,51 @@ export function ManuscriptForm() {
           </label>
           <div className="mt-1">
             <TagInput tags={tagNames} onChange={setTagNames} />
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700">
+            Cover Image (optional)
+          </label>
+          <div className="mt-1 flex items-start gap-4">
+            <div className="h-36 w-24 flex-shrink-0 overflow-hidden rounded border border-gray-200 bg-gray-100 shadow-sm">
+              {coverPreviewUrl && (
+                <img
+                  src={coverPreviewUrl}
+                  alt="Cover preview"
+                  className="h-full w-full object-cover"
+                />
+              )}
+            </div>
+            <div className="flex flex-col gap-2">
+              <input
+                ref={coverInputRef}
+                type="file"
+                accept=".jpg,.jpeg,.png"
+                onChange={handleCoverChange}
+                className="hidden"
+              />
+              <button
+                type="button"
+                onClick={() => coverInputRef.current?.click()}
+                className="rounded border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+              >
+                {coverFile ? 'Replace Image' : 'Choose Image'}
+              </button>
+              {coverFile && (
+                <>
+                  <span className="text-sm text-gray-600">{coverFile.name}</span>
+                  <button
+                    type="button"
+                    onClick={removeCover}
+                    className="text-left text-sm text-red-600 hover:text-red-800"
+                  >
+                    Remove
+                  </button>
+                </>
+              )}
+            </div>
           </div>
         </div>
 
