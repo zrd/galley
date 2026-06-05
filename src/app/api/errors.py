@@ -57,14 +57,14 @@ def register_error_handlers(app: FastAPI) -> None:
     async def conversion_error_handler(request: Request, exc: ConversionError) -> JSONResponse:
         return JSONResponse(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            content={"detail": f"Conversion failed: {exc}"},
+            content={"detail": "Document conversion failed."},
         )
 
     @app.exception_handler(GenerationError)
     async def generation_error_handler(request: Request, exc: GenerationError) -> JSONResponse:
         return JSONResponse(
             status_code=status.HTTP_400_BAD_REQUEST,
-            content={"detail": str(exc)},
+            content={"detail": "Ebook generation failed."},
         )
 
     @app.exception_handler(DomainError)

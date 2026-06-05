@@ -140,6 +140,65 @@ class TestManuscript:
         manuscript.mark_ready()
         assert manuscript.can_generate_ebook()
 
+    def test_mark_draft_from_ready(self):
+        from uuid import uuid4
+
+        manuscript = Manuscript(
+            author_id=uuid4(),
+            title="Test Book",
+            source_format=SourceFormat.EPUB,
+            source_file_key="manuscripts/test.epub",
+        )
+        manuscript.mark_ready()
+        manuscript.mark_draft()
+
+        assert manuscript.state == ManuscriptState.DRAFT
+
+    def test_mark_draft_from_draft_raises(self):
+        from uuid import uuid4
+
+        manuscript = Manuscript(
+            author_id=uuid4(),
+            title="Test Book",
+            source_format=SourceFormat.EPUB,
+            source_file_key="manuscripts/test.epub",
+        )
+
+        with pytest.raises(InvalidStateTransition):
+            manuscript.mark_draft()
+
+    def test_mark_draft_from_archived_raises(self):
+        from uuid import uuid4
+
+        manuscript = Manuscript(
+            author_id=uuid4(),
+            title="Test Book",
+            source_format=SourceFormat.EPUB,
+            source_file_key="manuscripts/test.epub",
+        )
+        manuscript.mark_ready()
+        manuscript.archive()
+
+        with pytest.raises(InvalidStateTransition):
+            manuscript.mark_draft()
+
+    def test_mark_draft_touches_updated_at(self):
+        import time
+        from uuid import uuid4
+
+        manuscript = Manuscript(
+            author_id=uuid4(),
+            title="Test Book",
+            source_format=SourceFormat.EPUB,
+            source_file_key="manuscripts/test.epub",
+        )
+        manuscript.mark_ready()
+        before = manuscript.updated_at
+        time.sleep(0.01)
+        manuscript.mark_draft()
+
+        assert manuscript.updated_at > before
+
     def test_archive_and_unarchive(self):
         from uuid import uuid4
 

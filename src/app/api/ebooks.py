@@ -11,7 +11,7 @@ from fastapi.responses import Response
 from sqlalchemy.orm import Session
 
 from app.db import get_db
-from app.domain import Download, Ebook, EbookNotFound, ManuscriptNotFound
+from app.domain import Download, Ebook, EbookNotFound, ManuscriptNotFound, ManuscriptInDraft
 from app.repositories import (
     SQLAlchemyAuthorRepository,
     SQLAlchemyDownloadRepository,
@@ -36,8 +36,9 @@ def get_manuscript_service(db: Annotated[Session, Depends(get_db)]) -> Manuscrip
 
 
 def get_ebook_service(db: Annotated[Session, Depends(get_db)]) -> EbookService:
+    manuscript_repo = SQLAlchemyManuscriptRepository(db)
     repo = SQLAlchemyEbookRepository(db)
-    return EbookService(repo)
+    return EbookService(repo, manuscript_repo)
 
 
 def get_generation_service(db: Annotated[Session, Depends(get_db)]) -> GenerationService:
@@ -146,9 +147,13 @@ async def download_ebook(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ebook not found")
 
     try:
-        ebook = ebook_service.get(eid)
+        ebook = ebook_service.get_public_download(eid)
     except EbookNotFound:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ebook not found")
+    except ManuscriptNotFound:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Manuscript not found")
+    except ManuscriptInDraft:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Temporarily unavailable")
 
     # Download file from storage
     storage = get_storage_backend()
@@ -283,6 +288,12 @@ async def generate_ebooks(
     except ManuscriptNotFound:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Manuscript not found")
 
+    if not manuscript.can_generate_ebook():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Manuscript must be in READY state to generate ebooks (current: {manuscript.state.value})",
+        )
+
     # Get author for display name in filename
     author = author_service.get(author_id)
 
@@ -295,8 +306,11 @@ async def generate_ebooks(
                 author_display_name=author.display_name,
             )
             ebooks.append(ebook)
-        except GenerationError as e:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+        except GenerationError:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Could not generate {output_format.value.upper()} from this manuscript. The source format may not support this conversion.",
+            )
 
     return [
         EbookRead(

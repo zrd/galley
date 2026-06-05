@@ -12,6 +12,7 @@ from .exceptions import (
     EntityNotFound,
     InvalidStateTransition,
     ManuscriptNotFound,
+    ManuscriptInDraft,
     SampleNotFound,
     TagNotFound,
 )
@@ -44,6 +45,7 @@ __all__ = [
     "EntityNotFound",
     "InvalidStateTransition",
     "ManuscriptNotFound",
+    "ManuscriptInDraft",
     "SampleNotFound",
     "TagNotFound",
 ]

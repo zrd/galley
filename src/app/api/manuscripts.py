@@ -10,7 +10,7 @@ from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
 from app.db import get_db
-from app.domain import AuthorizationError, ManuscriptNotFound, SourceFormat
+from app.domain import AuthorizationError, ManuscriptNotFound, SourceFormat, InvalidStateTransition
 from app.repositories import (
     SQLAlchemyEbookRepository,
     SQLAlchemyManuscriptRepository,
@@ -431,6 +431,43 @@ def mark_manuscript_ready(
     except ManuscriptNotFound:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Manuscript not found")
     except Exception as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+    return ManuscriptRead(
+        id=manuscript.id,
+        author_id=manuscript.author_id,
+        title=manuscript.title,
+        description=manuscript.description,
+        genres=manuscript.genres,
+        tags=manuscript.tags,
+        cover_image_key=manuscript.cover_image_key,
+        source_format=manuscript.source_format,
+        state=manuscript.state,
+        created_at=manuscript.created_at,
+        updated_at=manuscript.updated_at,
+    )
+
+
+@router.post("/{manuscript_id}/draft", response_model=ManuscriptRead)
+def mark_manuscript_draft(
+    manuscript_id: str,
+    author_id: CurrentAuthorId,
+    service: Annotated[ManuscriptService, Depends(get_manuscript_service)],
+) -> ManuscriptRead:
+    """Mark manuscript as undergoing editing, and unavailable."""
+    try:
+        mid = UUID(manuscript_id)
+    except ValueError:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Manuscript not found")
+
+    if not service.check_ownership(mid, author_id):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Manuscript not found")
+
+    try:
+        manuscript = service.mark_draft(mid)
+    except ManuscriptNotFound:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Manuscript not found")
+    except InvalidStateTransition as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
     return ManuscriptRead(

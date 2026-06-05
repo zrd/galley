@@ -444,7 +444,8 @@ class TestEbookService:
     @pytest.fixture
     def service(self, db_session: Session) -> EbookService:
         repo = SQLAlchemyEbookRepository(db_session)
-        return EbookService(repo)
+        manuscript_repo = SQLAlchemyManuscriptRepository(db_session)
+        return EbookService(repo, manuscript_repo)
 
     @pytest.fixture
     def manuscript_id(self, db_session: Session):

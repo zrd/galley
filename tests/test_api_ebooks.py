@@ -907,3 +907,53 @@ class TestEbookVisibility:
         client.delete(f"/manuscripts/{ready_manuscript_id}", headers=auth_headers)
 
         assert client.post(f"/ebooks/{ebook_id}/publish", headers=auth_headers).status_code == 404
+
+
+class TestDraftDownloadGate:
+    @pytest.fixture
+    def manuscript_with_ebook(
+        self, client: TestClient, auth_headers: dict, sample_epub: bytes
+    ) -> tuple[str, str]:
+        """Ready manuscript with one generated ebook. Returns (manuscript_id, ebook_id)."""
+        response = client.post(
+            "/manuscripts/",
+            headers=auth_headers,
+            data={"title": "Gate Test Book", "source_format": "epub"},
+            files={"file": ("book.epub", io.BytesIO(sample_epub), "application/epub+zip")},
+        )
+        manuscript_id = response.json()["id"]
+        client.post(f"/manuscripts/{manuscript_id}/ready", headers=auth_headers)
+        gen = client.post(
+            f"/ebooks/manuscripts/{manuscript_id}/generate",
+            headers=auth_headers,
+            json={"output_formats": ["epub"]},
+        )
+        ebook_id = gen.json()[0]["id"]
+        return manuscript_id, ebook_id
+
+    def test_download_blocked_when_manuscript_in_draft(
+        self, client: TestClient, auth_headers: dict, manuscript_with_ebook: tuple[str, str]
+    ):
+        manuscript_id, ebook_id = manuscript_with_ebook
+
+        client.post(f"/manuscripts/{manuscript_id}/draft", headers=auth_headers)
+
+        response = client.get(f"/ebooks/{ebook_id}/download")
+
+        assert response.status_code == 403
+
+    def test_download_round_trip(
+        self, client: TestClient, auth_headers: dict, manuscript_with_ebook: tuple[str, str]
+    ):
+        manuscript_id, ebook_id = manuscript_with_ebook
+
+        # READY — gate is open
+        assert client.get(f"/ebooks/{ebook_id}/download").status_code != 403
+
+        # Revert to DRAFT — gate closes
+        client.post(f"/manuscripts/{manuscript_id}/draft", headers=auth_headers)
+        assert client.get(f"/ebooks/{ebook_id}/download").status_code == 403
+
+        # Mark READY again — gate reopens
+        client.post(f"/manuscripts/{manuscript_id}/ready", headers=auth_headers)
+        assert client.get(f"/ebooks/{ebook_id}/download").status_code != 403

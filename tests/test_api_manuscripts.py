@@ -327,6 +327,97 @@ class TestMarkReady:
         assert response.status_code == 400
 
 
+class TestMarkDraft:
+    def test_mark_draft_success(
+        self, client: TestClient, auth_headers: dict, sample_epub: bytes
+    ):
+        create_response = client.post(
+            "/manuscripts/",
+            headers=auth_headers,
+            data={"title": "Revert Me", "source_format": "epub"},
+            files={"file": ("book.epub", io.BytesIO(sample_epub), "application/epub+zip")},
+        )
+        manuscript_id = create_response.json()["id"]
+        client.post(f"/manuscripts/{manuscript_id}/ready", headers=auth_headers)
+
+        response = client.post(f"/manuscripts/{manuscript_id}/draft", headers=auth_headers)
+
+        assert response.status_code == 200
+        assert response.json()["state"] == "draft"
+
+    def test_mark_draft_from_draft_fails(
+        self, client: TestClient, auth_headers: dict, sample_epub: bytes
+    ):
+        create_response = client.post(
+            "/manuscripts/",
+            headers=auth_headers,
+            data={"title": "Already Draft", "source_format": "epub"},
+            files={"file": ("book.epub", io.BytesIO(sample_epub), "application/epub+zip")},
+        )
+        manuscript_id = create_response.json()["id"]
+
+        response = client.post(f"/manuscripts/{manuscript_id}/draft", headers=auth_headers)
+
+        assert response.status_code == 400
+
+    def test_mark_draft_from_archived_fails(
+        self, client: TestClient, auth_headers: dict, sample_epub: bytes
+    ):
+        create_response = client.post(
+            "/manuscripts/",
+            headers=auth_headers,
+            data={"title": "Archived Book", "source_format": "epub"},
+            files={"file": ("book.epub", io.BytesIO(sample_epub), "application/epub+zip")},
+        )
+        manuscript_id = create_response.json()["id"]
+        client.post(f"/manuscripts/{manuscript_id}/ready", headers=auth_headers)
+        client.post(f"/manuscripts/{manuscript_id}/archive", headers=auth_headers)
+
+        response = client.post(f"/manuscripts/{manuscript_id}/draft", headers=auth_headers)
+
+        assert response.status_code == 400
+
+    def test_mark_draft_wrong_owner(
+        self, client: TestClient, auth_headers: dict, sample_epub: bytes
+    ):
+        import uuid
+
+        other = client.post(
+            "/auth/register",
+            json={
+                "email": f"other-{uuid.uuid4()}@example.com",
+                "password": "testpassword",
+                "display_name": "Other Author",
+            },
+        )
+        other_headers = {"Authorization": f"Bearer {other.json()['access_token']}"}
+
+        create_response = client.post(
+            "/manuscripts/",
+            headers=other_headers,
+            data={"title": "Not Yours", "source_format": "epub"},
+            files={"file": ("book.epub", io.BytesIO(sample_epub), "application/epub+zip")},
+        )
+        manuscript_id = create_response.json()["id"]
+        client.post(f"/manuscripts/{manuscript_id}/ready", headers=other_headers)
+
+        response = client.post(f"/manuscripts/{manuscript_id}/draft", headers=auth_headers)
+
+        assert response.status_code == 404
+
+    def test_mark_draft_malformed_uuid(self, client: TestClient, auth_headers: dict):
+        response = client.post("/manuscripts/not-a-uuid/draft", headers=auth_headers)
+
+        assert response.status_code == 404
+
+    def test_mark_draft_nonexistent(self, client: TestClient, auth_headers: dict):
+        import uuid
+
+        response = client.post(f"/manuscripts/{uuid.uuid4()}/draft", headers=auth_headers)
+
+        assert response.status_code == 404
+
+
 class TestDeleteManuscript:
     def test_delete_manuscript_success(
         self, client: TestClient, auth_headers: dict, sample_epub: bytes
@@ -1169,7 +1260,7 @@ class TestGetCover:
         response = client.get(f"/manuscripts/{fake_id}/cover", headers=auth_headers)
         assert response.status_code == 404
 
-    def test_get_cover_wrong_owner(
+    def test_get_cover_accessible_to_other_users(
         self, client: TestClient, auth_headers: dict, manuscript_id: str, sample_jpeg: bytes
     ):
         import uuid as uuid_mod
@@ -1188,7 +1279,7 @@ class TestGetCover:
         )
         other_headers = {"Authorization": f"Bearer {other.json()['access_token']}"}
         response = client.get(f"/manuscripts/{manuscript_id}/cover", headers=other_headers)
-        assert response.status_code == 404
+        assert response.status_code == 200
 
     def test_get_cover_no_auth(
         self, client: TestClient, auth_headers: dict, manuscript_id: str, sample_jpeg: bytes
@@ -1199,7 +1290,7 @@ class TestGetCover:
             files={"file": ("cover.jpg", io.BytesIO(sample_jpeg), "image/jpeg")},
         )
         response = client.get(f"/manuscripts/{manuscript_id}/cover")
-        assert response.status_code == 401
+        assert response.status_code == 200
 
 
 class TestDeleteCover:

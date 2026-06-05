@@ -28,6 +28,12 @@ class ManuscriptNotFound(EntityNotFound):
     pass
 
 
+class ManuscriptInDraft(DomainError):
+    """Raised when a manuscript is in draft state and not publicly available."""
+
+    pass
+
+
 class SampleNotFound(EntityNotFound):
     """Raised when a sample is not found."""
 

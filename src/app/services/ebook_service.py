@@ -1,13 +1,14 @@
 from uuid import UUID
 
-from app.domain import Ebook, EbookNotFound, OutputFormat
-from app.repositories.protocols import EbookRepository
+from app.domain import Ebook, EbookNotFound, OutputFormat, ManuscriptNotFound, ManuscriptInDraft, ManuscriptState
+from app.repositories.protocols import EbookRepository, ManuscriptRepository
 from app.schemas.ebook import EbookUpdate
 
 
 class EbookService:
-    def __init__(self, repo: EbookRepository) -> None:
+    def __init__(self, repo: EbookRepository, manuscript_repo: ManuscriptRepository) -> None:
         self.repo = repo
+        self.manuscript_repo = manuscript_repo
 
     def create(
         self,
@@ -32,6 +33,20 @@ class EbookService:
         ebook = self.repo.get(ebook_id, include_deleted=include_deleted)
         if ebook is None:
             raise EbookNotFound(f"Ebook {ebook_id} not found")
+        return ebook
+
+    def get_public_download(self, ebook_id: UUID) -> Ebook:
+        ebook = self.repo.get(ebook_id, include_deleted=False)
+        if ebook is None:
+            raise EbookNotFound(f"Ebook {ebook_id} not found")
+
+        manuscript = self.manuscript_repo.get(ebook.manuscript_id)
+        if manuscript is None:
+            raise ManuscriptNotFound(f"Manuscript for Ebook {ebook_id} not found")
+
+        if manuscript.state == ManuscriptState.DRAFT:
+            raise ManuscriptInDraft(f"Manuscript {manuscript.id} in draft state")
+
         return ebook
 
     def list_by_author(self, author_id: UUID, *, include_deleted: bool = False) -> list[Ebook]:

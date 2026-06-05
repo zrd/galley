@@ -43,6 +43,15 @@ class Manuscript:
         self.state = ManuscriptState.READY
         self._touch()
 
+    def mark_draft(self):
+        """Transition manuscript back to draft state, blocking download and visibility."""
+        if self.state != ManuscriptState.READY:
+            raise InvalidStateTransition(
+                f"Cannot mark manuscript as draft from state '{self.state.value}'"
+            )
+        self.state = ManuscriptState.DRAFT
+        self._touch()
+
     def archive(self) -> None:
         """Archive the manuscript."""
         if self.state == ManuscriptState.ARCHIVED:

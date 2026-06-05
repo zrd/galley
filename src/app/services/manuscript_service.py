@@ -89,6 +89,11 @@ class ManuscriptService:
         manuscript.mark_ready()
         return self.repo.update(manuscript)
 
+    def mark_draft(self, manuscript_id: UUID) -> Manuscript:
+        manuscript = self.get(manuscript_id)
+        manuscript.mark_draft()
+        return self.repo.update(manuscript)
+
     def archive(self, manuscript_id: UUID) -> Manuscript:
         manuscript = self.get(manuscript_id)
         manuscript.archive()
