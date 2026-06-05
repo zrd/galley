@@ -61,11 +61,35 @@ export function useMarkReady() {
   });
 }
 
+export function useMarkDraft() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (id: string) => manuscriptsApi.markDraft(id),
+    onSuccess: (_, id) => {
+      queryClient.invalidateQueries({ queryKey: ['manuscripts'] });
+      queryClient.invalidateQueries({ queryKey: ['manuscripts', id] });
+    },
+  });
+}
+
 export function useArchiveManuscript() {
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: (id: string) => manuscriptsApi.archive(id),
+    onSuccess: (_, id) => {
+      queryClient.invalidateQueries({ queryKey: ['manuscripts'] });
+      queryClient.invalidateQueries({ queryKey: ['manuscripts', id] });
+    },
+  });
+}
+
+export function useUnarchiveManuscript() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (id: string) => manuscriptsApi.unarchive(id),
     onSuccess: (_, id) => {
       queryClient.invalidateQueries({ queryKey: ['manuscripts'] });
       queryClient.invalidateQueries({ queryKey: ['manuscripts', id] });

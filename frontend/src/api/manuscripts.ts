@@ -72,6 +72,10 @@ export const manuscriptsApi = {
     return apiClient.post<Manuscript>(`/manuscripts/${id}/ready`);
   },
 
+  async markDraft(id: string): Promise<Manuscript> {
+    return apiClient.post<Manuscript>(`/manuscripts/${id}/draft`);
+  },
+
   async archive(id: string): Promise<Manuscript> {
     return apiClient.post<Manuscript>(`/manuscripts/${id}/archive`);
   },

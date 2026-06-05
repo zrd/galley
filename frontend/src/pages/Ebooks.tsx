@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useEbooks } from '../hooks/useEbooks';
 import { useManuscripts } from '../hooks/useManuscripts';
@@ -18,12 +19,32 @@ const formatLabels: Record<OutputFormat, string> = {
 export function Ebooks() {
   const { data: ebooks, isLoading: ebooksLoading, error: ebooksError } = useEbooks();
   const { data: manuscripts, isLoading: manuscriptsLoading } = useManuscripts();
+  const [downloadErrors, setDownloadErrors] = useState<Record<string, string>>({});
 
   const isLoading = ebooksLoading || manuscriptsLoading;
 
   const getManuscriptTitle = (manuscriptId: string) => {
     const manuscript = manuscripts?.find((m) => m.id === manuscriptId);
     return manuscript?.title || 'Unknown Manuscript';
+  };
+
+  const handleDownloadEbook = async (ebookId: string) => {
+    const url = ebooksApi.getDownloadUrl(ebookId);
+    const response = await fetch(url);
+    if (!response.ok) {
+      setDownloadErrors((prev) => ({
+        ...prev,
+        [ebookId]: response.status === 403 ? 'Temporarily unavailable' : 'Download failed',
+      }));
+      return;
+    }
+    setDownloadErrors((prev) => { const next = { ...prev }; delete next[ebookId]; return next; });
+    const blob = await response.blob();
+    const objectUrl = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = objectUrl;
+    a.click();
+    URL.revokeObjectURL(objectUrl);
   };
 
   if (isLoading) {
@@ -134,13 +155,21 @@ export function Ebooks() {
                     {new Date(ebook.created_at).toLocaleDateString()}
                   </td>
                   <td className="whitespace-nowrap px-6 py-2 align-middle text-right text-sm">
-                    <a
-                      href={ebooksApi.getDownloadUrl(ebook.id)}
-                      className="rounded bg-blue-600 px-3 py-1 text-white hover:bg-blue-700"
-                      download
-                    >
-                      Download
-                    </a>
+                    {manuscript?.state === 'draft' ? (
+                      <span className="text-gray-400 italic">Unavailable while in draft</span>
+                    ) : (
+                      <div className="flex flex-col items-end gap-1">
+                        <button
+                          onClick={() => handleDownloadEbook(ebook.id)}
+                          className="rounded bg-blue-600 px-3 py-1 text-white hover:bg-blue-700"
+                        >
+                          Download
+                        </button>
+                        {downloadErrors[ebook.id] && (
+                          <span className="text-xs text-red-600">{downloadErrors[ebook.id]}</span>
+                        )}
+                      </div>
+                    )}
                   </td>
                 </tr>
                 );

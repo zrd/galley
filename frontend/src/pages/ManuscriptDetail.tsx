@@ -4,6 +4,9 @@ import {
   useManuscript,
   useUpdateManuscript,
   useMarkReady,
+  useMarkDraft,
+  useArchiveManuscript,
+  useUnarchiveManuscript,
   useDeleteManuscript,
   useGenerateEbook,
 } from '../hooks/useManuscripts';
@@ -11,6 +14,7 @@ import { useEbooksByManuscript } from '../hooks/useEbooks';
 import { useGenreList } from '../hooks/useGenres';
 import { ebooksApi } from '../api/ebooks';
 import { manuscriptsApi } from '../api/manuscripts';
+import { ApiError } from '../api/client';
 import type { OutputFormat, ManuscriptState } from '../types';
 
 function TagInput({
@@ -101,6 +105,9 @@ export function ManuscriptDetail() {
   const { data: ebooks, isLoading: ebooksLoading } = useEbooksByManuscript(id!);
   const updateManuscript = useUpdateManuscript();
   const markReady = useMarkReady();
+  const markDraft = useMarkDraft();
+  const archiveManuscript = useArchiveManuscript();
+  const unarchiveManuscript = useUnarchiveManuscript();
   const deleteManuscript = useDeleteManuscript();
   const generateEbook = useGenerateEbook();
 
@@ -112,6 +119,7 @@ export function ManuscriptDetail() {
   const [selectedGenreIds, setSelectedGenreIds] = useState<number[]>([]);
   const [tagNames, setTagNames] = useState<string[]>([]);
   const [selectedFormats, setSelectedFormats] = useState<OutputFormat[]>(['epub']);
+  const [downloadErrors, setDownloadErrors] = useState<Record<string, string>>({});
 
   const coverFileInputRef = useRef<HTMLInputElement>(null);
   const [isUploadingCover, setIsUploadingCover] = useState(false);
@@ -142,6 +150,42 @@ export function ManuscriptDetail() {
     await markReady.mutateAsync(id);
   };
 
+  const handleMarkDraft = async () => {
+    if (!id) return;
+    if (!window.confirm('Revert to Draft? Ebook downloads will be temporarily unavailable until you mark it Ready again.')) return;
+    await markDraft.mutateAsync(id);
+  };
+
+  const handleArchive = async () => {
+    if (!id) return;
+    if (!window.confirm('Archive this manuscript? It will no longer appear in active listings.')) return;
+    await archiveManuscript.mutateAsync(id);
+  };
+
+  const handleUnarchive = async () => {
+    if (!id) return;
+    await unarchiveManuscript.mutateAsync(id);
+  };
+
+  const handleDownloadEbook = async (ebookId: string) => {
+    const url = ebooksApi.getDownloadUrl(ebookId);
+    const response = await fetch(url);
+    if (!response.ok) {
+      setDownloadErrors((prev) => ({
+        ...prev,
+        [ebookId]: response.status === 403 ? 'Temporarily unavailable' : 'Download failed',
+      }));
+      return;
+    }
+    setDownloadErrors((prev) => { const next = { ...prev }; delete next[ebookId]; return next; });
+    const blob = await response.blob();
+    const objectUrl = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = objectUrl;
+    a.click();
+    URL.revokeObjectURL(objectUrl);
+  };
+
   const handleDelete = async () => {
     if (!id) return;
     if (window.confirm('Are you sure you want to delete this manuscript?')) {
@@ -158,8 +202,15 @@ export function ManuscriptDetail() {
         formats: selectedFormats,
       });
       alert(`Generated ${ebooks.length} ebook(s) successfully!`);
-    } catch {
-      alert('Failed to generate ebook. Make sure the manuscript is in READY state.');
+    } catch (err) {
+      const detail =
+        err instanceof ApiError &&
+        typeof err.data === 'object' &&
+        err.data !== null &&
+        'detail' in err.data
+          ? String((err.data as { detail: unknown }).detail)
+          : null;
+      alert(detail ?? 'Failed to generate ebook.');
     }
   };
 
@@ -441,6 +492,36 @@ export function ManuscriptDetail() {
                 </button>
               )}
 
+              {manuscript.state === 'ready' && (
+                <button
+                  onClick={handleMarkDraft}
+                  disabled={markDraft.isPending}
+                  className="rounded border border-yellow-400 px-4 py-2 text-sm text-yellow-700 hover:bg-yellow-50 disabled:opacity-50"
+                >
+                  Revert to Draft
+                </button>
+              )}
+
+              {manuscript.state === 'ready' && (
+                <button
+                  onClick={handleArchive}
+                  disabled={archiveManuscript.isPending}
+                  className="rounded border border-gray-400 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                >
+                  Archive
+                </button>
+              )}
+
+              {manuscript.state === 'archived' && (
+                <button
+                  onClick={handleUnarchive}
+                  disabled={unarchiveManuscript.isPending}
+                  className="rounded border border-blue-400 px-4 py-2 text-sm text-blue-700 hover:bg-blue-50 disabled:opacity-50"
+                >
+                  Unarchive
+                </button>
+              )}
+
               <button
                 onClick={handleDelete}
                 disabled={deleteManuscript.isPending}
@@ -511,13 +592,23 @@ export function ManuscriptDetail() {
                     <span className="text-xs text-gray-500">(Sample)</span>
                   )}
                 </div>
-                <a
-                  href={ebooksApi.getDownloadUrl(ebook.id)}
-                  className="rounded bg-blue-600 px-3 py-1 text-sm text-white hover:bg-blue-700"
-                  download
-                >
-                  Download
-                </a>
+                {manuscript.state === 'draft' ? (
+                  <span className="text-sm text-gray-400 italic">
+                    Unavailable while in draft
+                  </span>
+                ) : (
+                  <div className="flex flex-col items-end gap-1">
+                    <button
+                      onClick={() => handleDownloadEbook(ebook.id)}
+                      className="rounded bg-blue-600 px-3 py-1 text-sm text-white hover:bg-blue-700"
+                    >
+                      Download
+                    </button>
+                    {downloadErrors[ebook.id] && (
+                      <span className="text-xs text-red-600">{downloadErrors[ebook.id]}</span>
+                    )}
+                  </div>
+                )}
               </div>
             ))}
           </div>
