@@ -13,7 +13,11 @@ export function Login() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const from = (location.state as { from?: { pathname: string } })?.from?.pathname || '/dashboard';
+  const sessionExpired = !!sessionStorage.getItem('login_redirect');
+  const from =
+    sessionStorage.getItem('login_redirect') ||
+    (location.state as { from?: { pathname: string } })?.from?.pathname ||
+    '/dashboard';
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -22,6 +26,7 @@ export function Login() {
 
     try {
       await login({ email, password });
+      sessionStorage.removeItem('login_redirect');
       navigate(from, { replace: true });
     } catch (err) {
       if (err instanceof ApiError) {
@@ -38,6 +43,12 @@ export function Login() {
     <div className="flex min-h-[80vh] items-center justify-center">
       <div className="w-full max-w-md">
         <h1 className="mb-8 text-center text-3xl font-bold">Login</h1>
+
+        {sessionExpired && (
+          <div className="mb-6 rounded bg-amber-50 p-4 text-amber-800">
+            Your session has expired. Please log in again.
+          </div>
+        )}
 
         <form onSubmit={handleSubmit} className="space-y-6">
           {error && (

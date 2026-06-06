@@ -21,6 +21,12 @@ function getAuthHeaders(): Record<string, string> {
 
 async function handleResponse<T>(response: Response): Promise<T> {
   if (!response.ok) {
+    if (response.status === 401) {
+      localStorage.removeItem('access_token');
+      sessionStorage.setItem('login_redirect', window.location.pathname + window.location.search);
+      window.location.href = '/login';
+      return new Promise(() => {});
+    }
     const data = await response.json().catch(() => ({}));
     throw new ApiError(response.status, response.statusText, data);
   }

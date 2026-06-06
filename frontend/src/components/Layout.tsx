@@ -1,7 +1,9 @@
 import { Outlet } from 'react-router-dom';
 import { Navbar } from './Navbar';
+import { useInactivityTimer } from '../hooks/useInactivityTimer';
 
 export function Layout() {
+  useInactivityTimer();
   return (
     <div className="min-h-screen bg-gray-50">
       <Navbar />
