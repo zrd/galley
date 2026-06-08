@@ -7,7 +7,7 @@ from uuid import UUID
 
 from slugify import slugify
 
-from sqlalchemy import delete, func, select
+from sqlalchemy import delete, func, select, update
 from sqlalchemy.orm import Session
 
 from app.db.models import (
@@ -18,7 +18,8 @@ from app.db.models import (
     ManuscriptModel,
     ManuscriptGenreModel,
     SampleModel,
-    TagModel, ManuscriptTagModel,
+    TagModel,
+    ManuscriptTagModel,
 )
 from app.domain import Author, Download, Ebook, Genre, Manuscript, Sample, Tag
 
@@ -146,10 +147,11 @@ class SQLAlchemyAuthorRepository:
         return _author_model_to_domain(model)
 
     def get_by_email(self, email: str, *, include_deleted: bool = False) -> Author | None:
-        query = self.session.query(AuthorModel).filter(AuthorModel.email == email)
+        stmt = select(AuthorModel).where(AuthorModel.email == email)
         if not include_deleted:
-            query = query.filter(AuthorModel.deleted_at.is_(None))
-        model = query.first()
+            stmt = stmt.where(AuthorModel.deleted_at.is_(None))
+
+        model = self.session.scalars(stmt).first()
         return _author_model_to_domain(model) if model else None
 
     def update(self, author: Author) -> Author:
@@ -213,13 +215,12 @@ class SQLAlchemyManuscriptRepository:
         return _manuscript_model_to_domain(model)
 
     def list_by_author(self, author_id: UUID, *, include_deleted: bool = False) -> list[Manuscript]:
-        query = (
-            self.session.query(ManuscriptModel)
-            .filter(ManuscriptModel.author_id == author_id)
-        )
+        stmt = select(ManuscriptModel).where(ManuscriptModel.author_id == author_id)
         if not include_deleted:
-            query = query.filter(ManuscriptModel.deleted_at.is_(None))
-        models = query.order_by(ManuscriptModel.updated_at.desc()).all()
+            stmt = stmt.where(ManuscriptModel.deleted_at.is_(None))
+
+        stmt = stmt.order_by(ManuscriptModel.updated_at.desc())
+        models = self.session.scalars(stmt).all()
         return [_manuscript_model_to_domain(m) for m in models]
 
     def update(self, manuscript: Manuscript) -> Manuscript:
@@ -256,10 +257,8 @@ class SQLAlchemyManuscriptRepository:
             self.session.flush()
 
     def set_genres(self, manuscript_id: UUID, genre_ids: list[int]) -> None:
-        self.session.query(ManuscriptGenreModel).filter(
-            ManuscriptGenreModel.manuscript_id == manuscript_id
-        ).delete()
-
+        stmt = delete(ManuscriptGenreModel).where(ManuscriptGenreModel.manuscript_id == manuscript_id)
+        self.session.execute(stmt)
         for genre_id in genre_ids:
             self.session.add(
                 ManuscriptGenreModel(manuscript_id=manuscript_id, genre_id=genre_id)
@@ -267,11 +266,8 @@ class SQLAlchemyManuscriptRepository:
         self.session.flush()
 
     def set_tags(self, manuscript_id: UUID, tag_ids: list[UUID]) -> None:
-        self.session.execute(
-            delete(ManuscriptTagModel).where(
-                ManuscriptTagModel.manuscript_id == manuscript_id
-            )
-        )
+        stmt = delete(ManuscriptTagModel).where(ManuscriptTagModel.manuscript_id == manuscript_id)
+        self.session.execute(stmt)
         for tag_id in tag_ids:
             self.session.add(
                 ManuscriptTagModel(manuscript_id=manuscript_id, tag_id=tag_id)
@@ -309,13 +305,12 @@ class SQLAlchemySampleRepository:
         return _sample_model_to_domain(model)
 
     def list_by_manuscript(self, manuscript_id: UUID, *, include_deleted: bool = False) -> list[Sample]:
-        query = (
-            self.session.query(SampleModel)
-            .filter(SampleModel.manuscript_id == manuscript_id)
-        )
+        stmt = select(SampleModel).where(SampleModel.manuscript_id == manuscript_id)
         if not include_deleted:
-            query = query.filter(SampleModel.deleted_at.is_(None))
-        models = query.order_by(SampleModel.created_at.desc()).all()
+            stmt = stmt.where(SampleModel.deleted_at.is_(None))
+
+        stmt = stmt.order_by(SampleModel.created_at.desc())
+        models = self.session.scalars(stmt).all()
         return [_sample_model_to_domain(m) for m in models]
 
     def update(self, sample: Sample) -> Sample:
@@ -346,10 +341,10 @@ class SQLAlchemySampleRepository:
 
     def soft_delete_by_manuscript(self, manuscript_id: UUID) -> None:
         now = datetime.now(timezone.utc)
-        self.session.query(SampleModel).filter(
-            SampleModel.manuscript_id == manuscript_id,
-            SampleModel.deleted_at.is_(None),
-        ).update({"deleted_at": now})
+        stmt = update(SampleModel).where(
+            SampleModel.manuscript_id == manuscript_id, SampleModel.deleted_at.is_(None)
+        ).values(deleted_at=now)
+        self.session.execute(stmt)
         self.session.flush()
 
     def restore(self, sample_id: UUID) -> None:
@@ -359,10 +354,10 @@ class SQLAlchemySampleRepository:
             self.session.flush()
 
     def restore_by_manuscript(self, manuscript_id: UUID) -> None:
-        self.session.query(SampleModel).filter(
-            SampleModel.manuscript_id == manuscript_id,
-            SampleModel.deleted_at.is_not(None),
-        ).update({"deleted_at": None})
+        stmt = update(SampleModel).where(
+            SampleModel.manuscript_id == manuscript_id, SampleModel.deleted_at.is_not(None)
+        ).values(deleted_at=None)
+        self.session.execute(stmt)
         self.session.flush()
 
 
@@ -402,34 +397,33 @@ class SQLAlchemyEbookRepository:
         return _ebook_model_to_domain(model)
 
     def list_by_manuscript(self, manuscript_id: UUID, *, include_deleted: bool = False) -> list[Ebook]:
-        query = (
-            self.session.query(EbookModel)
-            .filter(EbookModel.manuscript_id == manuscript_id)
-        )
+        stmt = select(EbookModel).where(EbookModel.manuscript_id == manuscript_id)
         if not include_deleted:
-            query = query.filter(EbookModel.deleted_at.is_(None))
-        models = query.order_by(EbookModel.created_at.desc()).all()
+            stmt = stmt.where(EbookModel.deleted_at.is_(None))
+
+        stmt = stmt.order_by(EbookModel.created_at.desc())
+        models = self.session.scalars(stmt).all()
         return [_ebook_model_to_domain(m) for m in models]
 
     def list_by_author(self, author_id: UUID, *, include_deleted: bool = False) -> list[Ebook]:
-        query = (
-            self.session.query(EbookModel)
-            .join(ManuscriptModel)
-            .filter(ManuscriptModel.author_id == author_id)
+        stmt = (select(EbookModel)
+                .join(ManuscriptModel)
+                .where(ManuscriptModel.author_id == author_id)
         )
         if not include_deleted:
-            query = query.filter(EbookModel.deleted_at.is_(None))
-        models = query.order_by(EbookModel.created_at.desc()).all()
+            stmt = stmt.where(EbookModel.deleted_at.is_(None))
+
+        stmt = stmt.order_by(EbookModel.created_at.desc())
+        models = self.session.scalars(stmt).all()
         return [_ebook_model_to_domain(m) for m in models]
 
     def list_by_sample(self, sample_id: UUID, *, include_deleted: bool = False) -> list[Ebook]:
-        query = (
-            self.session.query(EbookModel)
-            .filter(EbookModel.sample_id == sample_id)
-        )
+        stmt = select(EbookModel).where(EbookModel.sample_id == sample_id)
         if not include_deleted:
-            query = query.filter(EbookModel.deleted_at.is_(None))
-        models = query.order_by(EbookModel.created_at.desc()).all()
+            stmt = stmt.where(EbookModel.deleted_at.is_(None))
+
+        stmt = stmt.order_by(EbookModel.created_at.desc())
+        models = self.session.scalars(stmt).all()
         return [_ebook_model_to_domain(m) for m in models]
 
     def update(self, ebook: Ebook) -> Ebook:
@@ -454,9 +448,8 @@ class SQLAlchemyEbookRepository:
             self.session.flush()
 
     def delete_by_manuscript(self, manuscript_id: UUID) -> None:
-        self.session.query(EbookModel).filter(
-            EbookModel.manuscript_id == manuscript_id
-        ).delete()
+        stmt = delete(EbookModel).where(EbookModel.manuscript_id == manuscript_id)
+        self.session.execute(stmt)
         self.session.flush()
 
     def soft_delete(self, ebook_id: UUID) -> None:
@@ -467,18 +460,18 @@ class SQLAlchemyEbookRepository:
 
     def soft_delete_by_manuscript(self, manuscript_id: UUID) -> None:
         now = datetime.now(timezone.utc)
-        self.session.query(EbookModel).filter(
-            EbookModel.manuscript_id == manuscript_id,
-            EbookModel.deleted_at.is_(None),
-        ).update({"deleted_at": now})
+        stmt = update(EbookModel).where(
+            EbookModel.manuscript_id == manuscript_id, EbookModel.deleted_at.is_(None)
+        ).values(deleted_at=now)
+        self.session.execute(stmt)
         self.session.flush()
 
     def soft_delete_by_sample(self, sample_id: UUID) -> None:
         now = datetime.now(timezone.utc)
-        self.session.query(EbookModel).filter(
-            EbookModel.sample_id == sample_id,
-            EbookModel.deleted_at.is_(None),
-        ).update({"deleted_at": now})
+        stmt = update(EbookModel).where(
+            EbookModel.sample_id == sample_id, EbookModel.deleted_at.is_(None)
+        ).values(deleted_at=now)
+        self.session.execute(stmt)
         self.session.flush()
 
     def restore(self, ebook_id: UUID) -> None:
@@ -488,17 +481,17 @@ class SQLAlchemyEbookRepository:
             self.session.flush()
 
     def restore_by_manuscript(self, manuscript_id: UUID) -> None:
-        self.session.query(EbookModel).filter(
-            EbookModel.manuscript_id == manuscript_id,
-            EbookModel.deleted_at.is_not(None),
-        ).update({"deleted_at": None})
+        stmt = update(EbookModel).where(
+            EbookModel.manuscript_id == manuscript_id, EbookModel.deleted_at.is_not(None)
+        ).values(deleted_at=None)
+        self.session.execute(stmt)
         self.session.flush()
 
     def restore_by_sample(self, sample_id: UUID) -> None:
-        self.session.query(EbookModel).filter(
-            EbookModel.sample_id == sample_id,
-            EbookModel.deleted_at.is_not(None),
-        ).update({"deleted_at": None})
+        stmt = update(EbookModel).where(
+            EbookModel.sample_id == sample_id, EbookModel.deleted_at.is_not(None)
+        ).values(deleted_at=None)
+        self.session.execute(stmt)
         self.session.flush()
 
 
@@ -528,23 +521,20 @@ class SQLAlchemyDownloadRepository:
         return _download_model_to_domain(model)
 
     def list_by_ebook(self, ebook_id: UUID, *, include_deleted: bool = False) -> list[Download]:
-        query = (
-            self.session.query(DownloadModel)
-            .filter(DownloadModel.ebook_id == ebook_id)
-        )
+        stmt = select(DownloadModel).where(DownloadModel.ebook_id == ebook_id)
         if not include_deleted:
-            query = query.filter(DownloadModel.deleted_at.is_(None))
-        models = query.order_by(DownloadModel.downloaded_at.desc()).all()
+            stmt = stmt.where(DownloadModel.deleted_at.is_(None))
+
+        stmt = stmt.order_by(DownloadModel.downloaded_at.desc())
+        models = self.session.scalars(stmt).all()
         return [_download_model_to_domain(m) for m in models]
 
     def count_by_ebook(self, ebook_id: UUID, *, include_deleted: bool = False) -> int:
-        query = (
-            self.session.query(DownloadModel)
-            .filter(DownloadModel.ebook_id == ebook_id)
-        )
+        stmt = select(func.count(DownloadModel.id)).where(DownloadModel.ebook_id == ebook_id)
         if not include_deleted:
-            query = query.filter(DownloadModel.deleted_at.is_(None))
-        return query.count()
+            stmt = stmt.where(DownloadModel.deleted_at.is_(None))
+
+        return self.session.scalar(stmt) or 0
 
 
 class SQLAlchemyGenreRepository:
@@ -659,7 +649,7 @@ class SQLAlchemyTagRepository:
         rows = self.session.execute(stmt).all()
         return [_tag_model_to_domain(row.TagModel) for row in rows]
 
-    def list_all_(self) -> list[Tag]:
+    def list_all(self) -> list[Tag]:
         stmt = (
             select(TagModel, func.count(ManuscriptTagModel.manuscript_id).label("usage_count"))
             .join(ManuscriptTagModel, ManuscriptTagModel.tag_id == TagModel.id, isouter=True)
