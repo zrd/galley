@@ -28,18 +28,16 @@ def create_genre(
     name: Annotated[str, Form(min_length=1)],
     description: Annotated[str | None, Form()] = None,
     parent_id: Annotated[int | None, Form()] = None,
-):
-    return service.create(name=name, description=description, parent_id=parent_id)
+) -> GenreRead:
+    genre = service.create(name=name, description=description, parent_id=parent_id)
+    return GenreRead.model_validate(genre)
 
 
 @router.get("/", response_model=list[GenreListItem])
 def list_genres(
     service: Annotated[GenreService, Depends(get_genre_service)]
 ) -> list[GenreListItem]:
-    return [
-        GenreListItem(id=g.id, name=g.name, slug=g.slug, parent_id=g.parent_id)
-        for g in service.list_all()
-    ]
+    return [GenreListItem.model_validate(g) for g in service.list_all()]
 
 
 @router.get("/tree", response_model=list[GenreTree])
@@ -58,13 +56,7 @@ def get_genre(
         genre = service.get(genre_id)
     except GenreNotFound:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Genre not found")
-    return GenreRead(
-        id=genre.id,
-        name=genre.name,
-        slug=genre.slug,
-        description=genre.description,
-        parent_id=genre.parent_id
-    )
+    return GenreRead.model_validate(genre)
 
 
 @router.get("/{genre_id}/children", response_model=list[GenreListItem])
@@ -72,7 +64,4 @@ def list_by_parent(
     genre_id: int,
     service: Annotated[GenreService, Depends(get_genre_service)]
 ) -> list[GenreListItem]:
-    return [
-        GenreListItem(id=g.id, name=g.name, slug=g.slug, parent_id=g.parent_id)
-        for g in service.list_by_parent(parent_id=genre_id)
-    ]
+    return [GenreListItem.model_validate(g) for g in service.list_by_parent(parent_id=genre_id)]

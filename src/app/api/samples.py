@@ -84,17 +84,7 @@ def create_sample(
         promo_header=sample_in.promo_header,
         promo_footer=sample_in.promo_footer,
     )
-    return SampleRead(
-        id=sample.id,
-        manuscript_id=sample.manuscript_id,
-        title=sample.title,
-        excerpt_start=sample.excerpt_start,
-        excerpt_end=sample.excerpt_end,
-        promo_header=sample.promo_header,
-        promo_footer=sample.promo_footer,
-        created_at=sample.created_at,
-        updated_at=sample.updated_at,
-    )
+    return SampleRead.model_validate(sample)
 
 
 @router.get("/manuscripts/{manuscript_id}/samples", response_model=list[SampleRead])
@@ -115,21 +105,7 @@ def list_samples(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Manuscript not found")
 
     samples = sample_service.list_by_manuscript(mid, include_deleted=include_deleted)
-    return [
-        SampleRead(
-            id=s.id,
-            manuscript_id=s.manuscript_id,
-            title=s.title,
-            excerpt_start=s.excerpt_start,
-            excerpt_end=s.excerpt_end,
-            promo_header=s.promo_header,
-            promo_footer=s.promo_footer,
-            created_at=s.created_at,
-            updated_at=s.updated_at,
-            deleted_at=s.deleted_at,
-        )
-        for s in samples
-    ]
+    return [SampleRead.model_validate(s) for s in samples]
 
 
 @router.get("/{sample_id}", response_model=SampleRead)
@@ -154,17 +130,7 @@ def get_sample(
     if not manuscript_service.check_ownership(sample.manuscript_id, author_id):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Sample not found")
 
-    return SampleRead(
-        id=sample.id,
-        manuscript_id=sample.manuscript_id,
-        title=sample.title,
-        excerpt_start=sample.excerpt_start,
-        excerpt_end=sample.excerpt_end,
-        promo_header=sample.promo_header,
-        promo_footer=sample.promo_footer,
-        created_at=sample.created_at,
-        updated_at=sample.updated_at,
-    )
+    return SampleRead.model_validate(sample)
 
 
 @router.put("/{sample_id}", response_model=SampleRead)
@@ -198,17 +164,7 @@ def update_sample(
         promo_header=update_in.promo_header,
         promo_footer=update_in.promo_footer,
     )
-    return SampleRead(
-        id=sample.id,
-        manuscript_id=sample.manuscript_id,
-        title=sample.title,
-        excerpt_start=sample.excerpt_start,
-        excerpt_end=sample.excerpt_end,
-        promo_header=sample.promo_header,
-        promo_footer=sample.promo_footer,
-        created_at=sample.created_at,
-        updated_at=sample.updated_at,
-    )
+    return SampleRead.model_validate(sample)
 
 
 @router.delete("/{sample_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -260,17 +216,7 @@ def restore_sample(
 
     sample_service.restore(sid)
     sample = sample_service.get(sid)
-    return SampleRead(
-        id=sample.id,
-        manuscript_id=sample.manuscript_id,
-        title=sample.title,
-        excerpt_start=sample.excerpt_start,
-        excerpt_end=sample.excerpt_end,
-        promo_header=sample.promo_header,
-        promo_footer=sample.promo_footer,
-        created_at=sample.created_at,
-        updated_at=sample.updated_at,
-    )
+    return SampleRead.model_validate(sample)
 
 
 @router.post("/{sample_id}/generate", response_model=list[EbookRead])
@@ -314,15 +260,4 @@ async def generate_sample_ebooks(
         except GenerationError as e:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
-    return [
-        EbookRead(
-            id=e.id,
-            manuscript_id=e.manuscript_id,
-            sample_id=e.sample_id,
-            output_format=e.output_format,
-            file_size_bytes=e.file_size_bytes,
-            download_count=e.download_count,
-            created_at=e.created_at,
-        )
-        for e in ebooks
-    ]
+    return [EbookRead.model_validate(e) for e in ebooks]

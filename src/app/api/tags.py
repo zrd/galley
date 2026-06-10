@@ -28,14 +28,7 @@ def list_tags(
     owner_id: CurrentAuthorId
 ) -> list[TagRead]:
     tags = service.list_all(owner_id=owner_id)
-    return [
-        TagRead(
-            id=t.id,
-            name=t.name,
-            slug=t.slug,
-        )
-        for t in tags
-    ]
+    return [TagRead.model_validate(t) for t in tags]
 
 
 @router.get("/{slug}", response_model=TagRead)
@@ -47,8 +40,5 @@ def get_tag(
     tag = service.get_by_slug(slug=slug, owner_id=owner_id)
     if tag is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tag not found")
-    return TagRead(
-        id=tag.id,
-        name=tag.name,
-        slug=tag.slug,
-    )
+
+    return TagRead.model_validate(tag)

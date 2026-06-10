@@ -101,19 +101,7 @@ async def create_manuscript(
         genre_ids=genre_ids,
         tag_names=tag_names,
     )
-    return ManuscriptRead(
-        id=manuscript.id,
-        author_id=manuscript.author_id,
-        title=manuscript.title,
-        description=manuscript.description,
-        genres=manuscript.genres,
-        tags=manuscript.tags,
-        cover_image_key=manuscript.cover_image_key,
-        source_format=manuscript.source_format,
-        state=manuscript.state,
-        created_at=manuscript.created_at,
-        updated_at=manuscript.updated_at,
-    )
+    return ManuscriptRead.model_validate(manuscript)
 
 
 @router.get("/", response_model=list[ManuscriptListItem])
@@ -124,19 +112,7 @@ def list_manuscripts(
 ) -> list[ManuscriptListItem]:
     """List all manuscripts for the current author."""
     manuscripts = service.list_by_author(author_id, include_deleted=include_deleted)
-    return [
-        ManuscriptListItem(
-            id=m.id,
-            title=m.title,
-            state=m.state,
-            source_format=m.source_format,
-            cover_image_key=m.cover_image_key,
-            created_at=m.created_at,
-            updated_at=m.updated_at,
-            deleted_at=m.deleted_at,
-        )
-        for m in manuscripts
-    ]
+    return [ManuscriptListItem.model_validate(m) for m in manuscripts]
 
 
 @router.get("/{manuscript_id}", response_model=ManuscriptRead)
@@ -161,19 +137,7 @@ def get_manuscript(
     if manuscript.author_id != author_id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Manuscript not found")
 
-    return ManuscriptRead(
-        id=manuscript.id,
-        author_id=manuscript.author_id,
-        title=manuscript.title,
-        description=manuscript.description,
-        genres=manuscript.genres,
-        tags=manuscript.tags,
-        cover_image_key=manuscript.cover_image_key,
-        source_format=manuscript.source_format,
-        state=manuscript.state,
-        created_at=manuscript.created_at,
-        updated_at=manuscript.updated_at,
-    )
+    return ManuscriptRead.model_validate(manuscript)
 
 
 @router.put("/{manuscript_id}", response_model=ManuscriptRead)
@@ -208,19 +172,7 @@ def update_manuscript(
     except ManuscriptNotFound:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Manuscript not found")
 
-    return ManuscriptRead(
-        id=manuscript.id,
-        author_id=manuscript.author_id,
-        title=manuscript.title,
-        description=manuscript.description,
-        genres=manuscript.genres,
-        tags=manuscript.tags,
-        cover_image_key=manuscript.cover_image_key,
-        source_format=manuscript.source_format,
-        state=manuscript.state,
-        created_at=manuscript.created_at,
-        updated_at=manuscript.updated_at,
-    )
+    return ManuscriptRead.model_validate(manuscript)
 
 
 @router.put("/{manuscript_id}/file", response_model=ManuscriptRead)
@@ -266,19 +218,7 @@ async def update_manuscript_file(
     except ManuscriptNotFound:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Manuscript not found")
 
-    return ManuscriptRead(
-        id=manuscript.id,
-        author_id=manuscript.author_id,
-        title=manuscript.title,
-        description=manuscript.description,
-        genres=manuscript.genres,
-        tags=manuscript.tags,
-        cover_image_key=manuscript.cover_image_key,
-        source_format=manuscript.source_format,
-        state=manuscript.state,
-        created_at=manuscript.created_at,
-        updated_at=manuscript.updated_at,
-    )
+    return ManuscriptRead.model_validate(manuscript)
 
 
 @router.put("/{manuscript_id}/cover", response_model=ManuscriptRead, status_code=status.HTTP_200_OK)
@@ -334,19 +274,7 @@ async def upload_cover(
         except Exception as e:
             print(f"This is where I'd put my WARN: {e}\nlog, if I had one")
 
-    return ManuscriptRead(
-        id=updated.id,
-        author_id=updated.author_id,
-        title=updated.title,
-        description=updated.description,
-        genres=updated.genres,
-        tags=updated.tags,
-        cover_image_key=updated.cover_image_key,
-        source_format=updated.source_format,
-        state=updated.state,
-        created_at=updated.created_at,
-        updated_at=updated.updated_at,
-    )
+    return ManuscriptRead.model_validate(updated)
 
 
 @router.get("/{manuscript_id}/cover", response_class=FileResponse, status_code=status.HTTP_200_OK)
@@ -393,19 +321,7 @@ async def delete_cover(
         except Exception as e:
             print(f"This is where I'd put my WARN: {e}\nlog, if I had one")
 
-    return ManuscriptRead(
-        id=updated.id,
-        author_id=updated.author_id,
-        title=updated.title,
-        description=updated.description,
-        genres=updated.genres,
-        tags=updated.tags,
-        cover_image_key=updated.cover_image_key,
-        source_format=updated.source_format,
-        state=updated.state,
-        created_at=updated.created_at,
-        updated_at=updated.updated_at,
-    )
+    return ManuscriptRead.model_validate(updated)
 
 
 @router.post("/{manuscript_id}/ready", response_model=ManuscriptRead)
@@ -433,19 +349,7 @@ def mark_manuscript_ready(
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
-    return ManuscriptRead(
-        id=manuscript.id,
-        author_id=manuscript.author_id,
-        title=manuscript.title,
-        description=manuscript.description,
-        genres=manuscript.genres,
-        tags=manuscript.tags,
-        cover_image_key=manuscript.cover_image_key,
-        source_format=manuscript.source_format,
-        state=manuscript.state,
-        created_at=manuscript.created_at,
-        updated_at=manuscript.updated_at,
-    )
+    return ManuscriptRead.model_validate(manuscript)
 
 
 @router.post("/{manuscript_id}/draft", response_model=ManuscriptRead)
@@ -470,19 +374,7 @@ def mark_manuscript_draft(
     except InvalidStateTransition as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
-    return ManuscriptRead(
-        id=manuscript.id,
-        author_id=manuscript.author_id,
-        title=manuscript.title,
-        description=manuscript.description,
-        genres=manuscript.genres,
-        tags=manuscript.tags,
-        cover_image_key=manuscript.cover_image_key,
-        source_format=manuscript.source_format,
-        state=manuscript.state,
-        created_at=manuscript.created_at,
-        updated_at=manuscript.updated_at,
-    )
+    return ManuscriptRead.model_validate(manuscript)
 
 
 @router.post("/{manuscript_id}/archive", response_model=ManuscriptRead)
@@ -510,19 +402,7 @@ def archive_manuscript(
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
-    return ManuscriptRead(
-        id=manuscript.id,
-        author_id=manuscript.author_id,
-        title=manuscript.title,
-        description=manuscript.description,
-        genres=manuscript.genres,
-        tags=manuscript.tags,
-        cover_image_key=manuscript.cover_image_key,
-        source_format=manuscript.source_format,
-        state=manuscript.state,
-        created_at=manuscript.created_at,
-        updated_at=manuscript.updated_at,
-    )
+    return ManuscriptRead.model_validate(manuscript)
 
 
 @router.post("/{manuscript_id}/unarchive", response_model=ManuscriptRead)
@@ -550,19 +430,7 @@ def unarchive_manuscript(
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
-    return ManuscriptRead(
-        id=manuscript.id,
-        author_id=manuscript.author_id,
-        title=manuscript.title,
-        description=manuscript.description,
-        genres=manuscript.genres,
-        tags=manuscript.tags,
-        cover_image_key=manuscript.cover_image_key,
-        source_format=manuscript.source_format,
-        state=manuscript.state,
-        created_at=manuscript.created_at,
-        updated_at=manuscript.updated_at,
-    )
+    return ManuscriptRead.model_validate(manuscript)
 
 
 @router.delete("/{manuscript_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -620,16 +488,4 @@ def restore_manuscript(
     except ManuscriptNotFound:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Manuscript not found")
 
-    return ManuscriptRead(
-        id=manuscript.id,
-        author_id=manuscript.author_id,
-        title=manuscript.title,
-        description=manuscript.description,
-        genres=manuscript.genres,
-        tags=manuscript.tags,
-        cover_image_key=manuscript.cover_image_key,
-        source_format=manuscript.source_format,
-        state=manuscript.state,
-        created_at=manuscript.created_at,
-        updated_at=manuscript.updated_at,
-    )
+    return ManuscriptRead.model_validate(manuscript)

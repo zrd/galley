@@ -63,25 +63,7 @@ def list_ebooks(
 ) -> list[EbookListItem]:
     """List all ebooks for the current author."""
     ebooks = ebook_service.list_by_author(author_id, include_deleted=include_deleted)
-    return [
-        EbookListItem(
-            id=e.id,
-            manuscript_id=e.manuscript_id,
-            sample_id=e.sample_id,
-            output_format=e.output_format,
-            list_price_cents=e.list_price_cents,
-            sale_price_cents=e.sale_price_cents,
-            price_currency=e.price_currency,
-            file_size_bytes=e.file_size_bytes,
-            download_count=e.download_count,
-            visibility=e.visibility,
-            unlisted_download_limit=e.unlisted_download_limit,
-            created_at=e.created_at,
-            published_at=e.published_at,
-            deleted_at=e.deleted_at,
-        )
-        for e in ebooks
-    ]
+    return [EbookListItem.model_validate(e) for e in ebooks]
 
 
 @router.get("/{ebook_id}", response_model=EbookRead)
@@ -106,21 +88,7 @@ def get_ebook(
     if not manuscript_service.check_ownership(ebook.manuscript_id, author_id):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ebook not found")
 
-    return EbookRead(
-        id=ebook.id,
-        manuscript_id=ebook.manuscript_id,
-        sample_id=ebook.sample_id,
-        output_format=ebook.output_format,
-        list_price_cents=ebook.list_price_cents,
-        sale_price_cents=ebook.sale_price_cents,
-        price_currency=ebook.price_currency,
-        file_size_bytes=ebook.file_size_bytes,
-        download_count=ebook.download_count,
-        visibility=ebook.visibility,
-        unlisted_download_limit=ebook.unlisted_download_limit,
-        created_at=ebook.created_at,
-        published_at=ebook.published_at,
-    )
+    return EbookRead.model_validate(ebook)
 
 
 @router.get("/{ebook_id}/download")
@@ -242,21 +210,7 @@ def restore_ebook(
 
     ebook_service.restore(eid)
     ebook = ebook_service.get(eid)
-    return EbookRead(
-        id=ebook.id,
-        manuscript_id=ebook.manuscript_id,
-        sample_id=ebook.sample_id,
-        output_format=ebook.output_format,
-        list_price_cents=ebook.list_price_cents,
-        sale_price_cents=ebook.sale_price_cents,
-        price_currency=ebook.price_currency,
-        file_size_bytes=ebook.file_size_bytes,
-        download_count=ebook.download_count,
-        visibility=ebook.visibility,
-        unlisted_download_limit=ebook.unlisted_download_limit,
-        created_at=ebook.created_at,
-        published_at=ebook.published_at,
-    )
+    return EbookRead.model_validate(ebook)
 
 
 # Ebook generation endpoint (on manuscript)
@@ -312,24 +266,7 @@ async def generate_ebooks(
                 detail=f"Could not generate {output_format.value.upper()} from this manuscript. The source format may not support this conversion.",
             )
 
-    return [
-        EbookRead(
-            id=e.id,
-            manuscript_id=e.manuscript_id,
-            sample_id=e.sample_id,
-            output_format=e.output_format,
-            list_price_cents=e.list_price_cents,
-            sale_price_cents=e.sale_price_cents,
-            price_currency=e.price_currency,
-            file_size_bytes=e.file_size_bytes,
-            download_count=e.download_count,
-            visibility=e.visibility,
-            unlisted_download_limit=e.unlisted_download_limit,
-            created_at=e.created_at,
-            published_at=e.published_at,
-        )
-        for e in ebooks
-    ]
+    return [EbookRead.model_validate(e) for e in ebooks]
 
 
 @router.patch("/{ebook_id}", response_model=EbookRead)
@@ -355,21 +292,7 @@ def update_ebook_price(
 
     ebook_service.update_price(ebook=ebook, update_in=update_in)
     ebook = ebook_service.get(eid)
-    return EbookRead(
-        id=ebook.id,
-        manuscript_id=ebook.manuscript_id,
-        sample_id=ebook.sample_id,
-        output_format=ebook.output_format,
-        list_price_cents=ebook.list_price_cents,
-        sale_price_cents=ebook.sale_price_cents,
-        price_currency=ebook.price_currency,
-        file_size_bytes=ebook.file_size_bytes,
-        download_count=ebook.download_count,
-        visibility=ebook.visibility,
-        unlisted_download_limit=ebook.unlisted_download_limit,
-        created_at=ebook.created_at,
-        published_at=ebook.published_at,
-    )
+    return EbookRead.model_validate(ebook)
 
 
 def get_owned_ebook(
@@ -400,21 +323,7 @@ def publish_ebook(
     ebook_service: Annotated[EbookService, Depends(get_ebook_service)],
 ) -> EbookRead:
     ebook = ebook_service.publish(ebook_id=ebook.id)
-    return EbookRead(
-        id=ebook.id,
-        manuscript_id=ebook.manuscript_id,
-        sample_id=ebook.sample_id,
-        output_format=ebook.output_format,
-        list_price_cents=ebook.list_price_cents,
-        sale_price_cents=ebook.sale_price_cents,
-        price_currency=ebook.price_currency,
-        file_size_bytes=ebook.file_size_bytes,
-        download_count=ebook.download_count,
-        visibility=ebook.visibility,
-        unlisted_download_limit=ebook.unlisted_download_limit,
-        created_at=ebook.created_at,
-        published_at=ebook.published_at,
-    )
+    return EbookRead.model_validate(ebook)
 
 
 @router.post("/{ebook_id}/unlist", response_model=EbookRead)
@@ -423,21 +332,7 @@ def unlist_ebook(
     ebook_service: Annotated[EbookService, Depends(get_ebook_service)],
 ) -> EbookRead:
     ebook = ebook_service.unlist(ebook_id=ebook.id)
-    return EbookRead(
-        id=ebook.id,
-        manuscript_id=ebook.manuscript_id,
-        sample_id=ebook.sample_id,
-        output_format=ebook.output_format,
-        list_price_cents=ebook.list_price_cents,
-        sale_price_cents=ebook.sale_price_cents,
-        price_currency=ebook.price_currency,
-        file_size_bytes=ebook.file_size_bytes,
-        download_count=ebook.download_count,
-        visibility=ebook.visibility,
-        unlisted_download_limit=ebook.unlisted_download_limit,
-        created_at=ebook.created_at,
-        published_at=ebook.published_at,
-    )
+    return EbookRead.model_validate(ebook)
 
 
 @router.post("/{ebook_id}/make-private", response_model=EbookRead)
@@ -446,18 +341,4 @@ def make_ebook_private(
     ebook_service: Annotated[EbookService, Depends(get_ebook_service)],
 ) -> EbookRead:
     ebook = ebook_service.make_private(ebook_id=ebook.id)
-    return EbookRead(
-        id=ebook.id,
-        manuscript_id=ebook.manuscript_id,
-        sample_id=ebook.sample_id,
-        output_format=ebook.output_format,
-        list_price_cents=ebook.list_price_cents,
-        sale_price_cents=ebook.sale_price_cents,
-        price_currency=ebook.price_currency,
-        file_size_bytes=ebook.file_size_bytes,
-        download_count=ebook.download_count,
-        visibility=ebook.visibility,
-        unlisted_download_limit=ebook.unlisted_download_limit,
-        created_at=ebook.created_at,
-        published_at=ebook.published_at,
-    )
+    return EbookRead.model_validate(ebook)

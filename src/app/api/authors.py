@@ -29,12 +29,7 @@ def get_current_author(
 ) -> AuthorRead:
     """Get the current authenticated author's profile."""
     author = service.get(author_id)
-    return AuthorRead(
-        id=author.id,
-        email=author.email,
-        display_name=author.display_name,
-        created_at=author.created_at,
-    )
+    return AuthorRead.model_validate(author)
 
 
 @router.put("/me", response_model=AuthorRead)
@@ -46,9 +41,4 @@ def update_current_author(
 ) -> AuthorRead:
     """Update the current authenticated author's profile."""
     author = service.update(author_id, display_name=update_in.display_name)
-    return AuthorRead(
-        id=author.id,
-        email=author.email,
-        display_name=author.display_name,
-        created_at=author.created_at,
-    )
+    return AuthorRead.model_validate(author)
