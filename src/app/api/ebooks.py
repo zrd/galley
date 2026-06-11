@@ -3,7 +3,9 @@ Ebook management and download endpoints.
 """
 
 import hashlib
+import unicodedata
 from typing import Annotated
+from urllib.parse import quote
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
@@ -26,6 +28,10 @@ from app.services import AuthorService, EbookService, GenerationError, Generatio
 from app.storage import get_content_type_for_format, get_storage_backend
 
 router = APIRouter()
+
+
+def _ascii_filename(name: str) -> str:
+    return unicodedata.normalize("NFKD", name).encode("ascii", "ignore").decode("ascii").strip()
 
 
 def get_manuscript_service(db: Annotated[Session, Depends(get_db)]) -> ManuscriptService:
@@ -155,7 +161,10 @@ async def download_ebook(
         content=file_data,
         media_type=content_type,
         headers={
-            "Content-Disposition": f'attachment; filename="{ebook.download_filename}"',
+            "Content-Disposition": (
+                f'attachment; filename="{_ascii_filename(ebook.download_filename)}"; '
+                f"filename*=UTF-8''{quote(ebook.download_filename)}"
+            ),
             "Content-Length": str(len(file_data)),
         },
     )

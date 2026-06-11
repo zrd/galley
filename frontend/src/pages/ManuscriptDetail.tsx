@@ -178,10 +178,14 @@ export function ManuscriptDetail() {
       return;
     }
     setDownloadErrors((prev) => { const next = { ...prev }; delete next[ebookId]; return next; });
+    const cd = response.headers.get('Content-Disposition');
+    const match = cd?.match(/filename\*=UTF-8''([^;]+)/i) ?? cd?.match(/filename="([^"]+)"/i);
+    const filename = match ? decodeURIComponent(match[1]) : 'download.epub';
     const blob = await response.blob();
     const objectUrl = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = objectUrl;
+    a.download = filename;
     a.click();
     URL.revokeObjectURL(objectUrl);
   };

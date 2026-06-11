@@ -6,6 +6,7 @@ Handles generating ebooks from manuscripts, including:
 - Sample ebook generation with excerpts and promotional content
 """
 
+import re
 from uuid import UUID
 
 from app.domain import Ebook, Manuscript, OutputFormat, Sample
@@ -13,6 +14,13 @@ from app.repositories.protocols import EbookRepository
 from app.storage import generate_file_key, get_content_type_for_format, get_storage_backend
 
 from .conversion_service import ConversionService, get_conversion_service
+
+_WINDOWS_FORBIDDEN = re.compile(r'[\\/:*?"<>|]')
+
+
+def _sanitize_download_filename(name: str) -> str:
+    name = name.replace(':', ' -')
+    return _WINDOWS_FORBIDDEN.sub('', name).strip()
 
 
 class GenerationError(Exception):
@@ -81,7 +89,9 @@ class GenerationService:
         await storage.upload(file_key, output_data, content_type)
 
         # Create ebook record
-        download_filename = f"{author_display_name} - {manuscript.title}.{output_format.value}"
+        download_filename = _sanitize_download_filename(
+            f"{author_display_name} - {manuscript.title}.{output_format.value}"
+        )
         ebook = Ebook(
             manuscript_id=manuscript.id,
             output_format=output_format,
@@ -157,7 +167,9 @@ class GenerationService:
         await storage.upload(file_key, output_data, content_type)
 
         # Create ebook record
-        download_filename = f"{author_display_name} - {manuscript.title} ({sample.title}).{output_format.value}"
+        download_filename = _sanitize_download_filename(
+            f"{author_display_name} - {manuscript.title} ({sample.title}).{output_format.value}"
+        )
         ebook = Ebook(
             manuscript_id=manuscript.id,
             output_format=output_format,
