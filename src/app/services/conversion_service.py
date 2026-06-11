@@ -9,7 +9,9 @@ Provides format conversion between supported document formats:
 """
 
 import asyncio
+import sys
 import tempfile
+
 from pathlib import Path
 
 from app.domain import OutputFormat, SourceFormat
@@ -27,6 +29,8 @@ class ConversionService:
 
     Pandoc must be installed on the system for this service to work.
     """
+
+    MIN_OUTPUT_BYTES = 1024
 
     # Mapping of source formats to Pandoc input format names
     INPUT_FORMATS = {
@@ -108,7 +112,7 @@ class ConversionService:
                 cmd.extend(["--pdf-engine=xelatex"])
             elif output_format == OutputFormat.EPUB:
                 # EPUB-specific options
-                cmd.extend(["--epub-chapter-level=1"])
+                cmd.extend(["--split-level=1"])
 
             # Run pandoc
             try:
@@ -122,6 +126,8 @@ class ConversionService:
                 if process.returncode != 0:
                     error_msg = stderr.decode("utf-8", errors="replace")
                     raise ConversionError(f"Pandoc conversion failed: {error_msg}")
+                if stderr:
+                    print(f"[pandoc warning] {stderr.decode('utf-8', errors='replace')}", file=sys.stderr)
 
             except FileNotFoundError:
                 raise ConversionError(
@@ -132,7 +138,11 @@ class ConversionService:
             if not output_file.exists():
                 raise ConversionError("Conversion produced no output file")
 
-            return output_file.read_bytes()
+            output_bytes = output_file.read_bytes()
+            if len(output_bytes) < self.MIN_OUTPUT_BYTES:
+                raise ConversionError(f"Converted document is smaller than the minimum size allowed ({self.MIN_OUTPUT_BYTES} bytes)")
+
+            return output_bytes
 
     async def check_pandoc_available(self) -> bool:
         """Check if Pandoc is installed and available."""
