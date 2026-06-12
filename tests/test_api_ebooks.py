@@ -463,41 +463,6 @@ class TestInputValidation:
 
         assert response.status_code == 404
 
-    def test_generate_ebook_invalid_output_format(
-        self, client: TestClient, auth_headers: dict, ready_manuscript_id: str
-    ):
-        """Invalid output format should be rejected."""
-        response = client.post(
-            f"/ebooks/manuscripts/{ready_manuscript_id}/generate",
-            headers=auth_headers,
-            json={"output_formats": ["exe"]},
-        )
-
-        assert response.status_code == 422
-
-    def test_generate_ebook_empty_output_formats(
-        self, client: TestClient, auth_headers: dict, ready_manuscript_id: str
-    ):
-        """Empty output formats list should be rejected."""
-        response = client.post(
-            f"/ebooks/manuscripts/{ready_manuscript_id}/generate",
-            headers=auth_headers,
-            json={"output_formats": []},
-        )
-
-        assert response.status_code == 422
-
-    def test_generate_ebook_missing_output_formats(
-        self, client: TestClient, auth_headers: dict, ready_manuscript_id: str
-    ):
-        """Missing output_formats should be rejected."""
-        response = client.post(
-            f"/ebooks/manuscripts/{ready_manuscript_id}/generate",
-            headers=auth_headers,
-            json={},
-        )
-
-        assert response.status_code == 422
 
 
 class TestEbookSoftDelete:

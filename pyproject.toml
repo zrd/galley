@@ -45,7 +45,7 @@ dev = [
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "-ra"
+addopts = "-ra -n auto"
 
 [tool.ruff]
 line-length = 100
@@ -61,3 +61,8 @@ strict = true
 warn_unused_configs = true
 disallow_any_generics = true
 no_implicit_optional = true
+
+[dependency-groups]
+dev = [
+    "pytest-xdist>=3.8.0",
+]

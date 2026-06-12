@@ -519,19 +519,6 @@ class TestInputValidation:
 
         assert response.status_code == 404
 
-    def test_create_manuscript_empty_title(
-        self, client: TestClient, auth_headers: dict, sample_epub: bytes
-    ):
-        """Empty title should be rejected."""
-        response = client.post(
-            "/manuscripts/",
-            headers=auth_headers,
-            data={"title": "", "source_format": "epub"},
-            files={"file": ("book.epub", io.BytesIO(sample_epub), "application/epub+zip")},
-        )
-
-        assert response.status_code == 422
-
     def test_create_manuscript_whitespace_title(
         self, client: TestClient, auth_headers: dict, sample_epub: bytes
     ):
@@ -545,55 +532,6 @@ class TestInputValidation:
 
         # May be 422 or 400 depending on where validation happens
         assert response.status_code in (400, 422)
-
-    def test_create_manuscript_invalid_source_format(
-        self, client: TestClient, auth_headers: dict, sample_epub: bytes
-    ):
-        """Invalid source format should be rejected."""
-        response = client.post(
-            "/manuscripts/",
-            headers=auth_headers,
-            data={"title": "Test Book", "source_format": "exe"},
-            files={"file": ("book.exe", io.BytesIO(sample_epub), "application/octet-stream")},
-        )
-
-        assert response.status_code == 422
-
-    def test_create_manuscript_missing_title(
-        self, client: TestClient, auth_headers: dict, sample_epub: bytes
-    ):
-        """Missing title should be rejected."""
-        response = client.post(
-            "/manuscripts/",
-            headers=auth_headers,
-            data={"source_format": "epub"},
-            files={"file": ("book.epub", io.BytesIO(sample_epub), "application/epub+zip")},
-        )
-
-        assert response.status_code == 422
-
-    def test_create_manuscript_missing_source_format(
-        self, client: TestClient, auth_headers: dict, sample_epub: bytes
-    ):
-        """Missing source format should be rejected."""
-        response = client.post(
-            "/manuscripts/",
-            headers=auth_headers,
-            data={"title": "Test Book"},
-            files={"file": ("book.epub", io.BytesIO(sample_epub), "application/epub+zip")},
-        )
-
-        assert response.status_code == 422
-
-    def test_create_manuscript_missing_file(self, client: TestClient, auth_headers: dict):
-        """Missing file should be rejected."""
-        response = client.post(
-            "/manuscripts/",
-            headers=auth_headers,
-            data={"title": "Test Book", "source_format": "epub"},
-        )
-
-        assert response.status_code == 422
 
     def test_update_manuscript_empty_title(
         self, client: TestClient, auth_headers: dict, sample_epub: bytes

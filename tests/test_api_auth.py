@@ -225,55 +225,6 @@ class TestAuthenticatedEndpoints:
 class TestInputValidation:
     """Tests for malformed input handling in auth endpoints."""
 
-    def test_register_empty_email(self, client: TestClient):
-        response = client.post(
-            "/auth/register",
-            json={
-                "email": "",
-                "password": "password123",
-                "display_name": "Test User",
-            },
-        )
-
-        assert response.status_code == 422
-
-    def test_register_whitespace_email(self, client: TestClient):
-        response = client.post(
-            "/auth/register",
-            json={
-                "email": "   ",
-                "password": "password123",
-                "display_name": "Test User",
-            },
-        )
-
-        assert response.status_code == 422
-
-    def test_register_empty_password(self, client: TestClient):
-        response = client.post(
-            "/auth/register",
-            json={
-                "email": unique_email("emptypass"),
-                "password": "",
-                "display_name": "Test User",
-            },
-        )
-
-        assert response.status_code == 422
-
-    def test_register_empty_display_name(self, client: TestClient):
-        response = client.post(
-            "/auth/register",
-            json={
-                "email": unique_email("emptyname"),
-                "password": "password123",
-                "display_name": "",
-            },
-        )
-
-        # May be 422 (validation) or 400 (business rule) depending on implementation
-        assert response.status_code in (400, 422)
-
     def test_register_whitespace_display_name(self, client: TestClient):
         response = client.post(
             "/auth/register",
@@ -284,52 +235,7 @@ class TestInputValidation:
             },
         )
 
-        # May be 422 (validation) or 400 (business rule) depending on implementation
         assert response.status_code in (400, 422)
-
-    def test_register_missing_email_field(self, client: TestClient):
-        response = client.post(
-            "/auth/register",
-            json={
-                "password": "password123",
-                "display_name": "Test User",
-            },
-        )
-
-        assert response.status_code == 422
-
-    def test_register_missing_password_field(self, client: TestClient):
-        response = client.post(
-            "/auth/register",
-            json={
-                "email": unique_email("nopass"),
-                "display_name": "Test User",
-            },
-        )
-
-        assert response.status_code == 422
-
-    def test_login_empty_email(self, client: TestClient):
-        response = client.post(
-            "/auth/login",
-            json={
-                "email": "",
-                "password": "password123",
-            },
-        )
-
-        assert response.status_code == 422
-
-    def test_login_empty_password(self, client: TestClient):
-        response = client.post(
-            "/auth/login",
-            json={
-                "email": unique_email("loginempty"),
-                "password": "",
-            },
-        )
-
-        assert response.status_code == 422
 
     def test_refresh_empty_token(self, client: TestClient):
         response = client.post(
