@@ -362,6 +362,29 @@ class TestDownloadEbook:
         assert response.status_code == 200
         # Tracking is recorded internally - just verify download succeeds
 
+    def test_download_ebook_missing_file(
+        self,
+        client: TestClient,
+        auth_headers: dict,
+        ready_manuscript_id: str,
+        test_storage,
+    ):
+        """Returns 404 when the ebook record exists but file is gone from storage."""
+        generate_response = client.post(
+            f"/ebooks/manuscripts/{ready_manuscript_id}/generate",
+            headers=auth_headers,
+            json={"output_formats": ["epub"]},
+        )
+        ebook_id = generate_response.json()[0]["id"]
+
+        # Delete every file in storage so the ebook file is missing
+        for f in test_storage.base_path.rglob("*"):
+            if f.is_file():
+                f.unlink()
+
+        response = client.get(f"/ebooks/{ebook_id}/download")
+        assert response.status_code == 404
+
 
 class TestDeleteEbook:
     def test_delete_nonexistent_ebook(self, client: TestClient, auth_headers: dict):
@@ -434,34 +457,34 @@ class TestInputValidation:
     """Tests for malformed input handling in ebook endpoints."""
 
     def test_get_ebook_malformed_uuid(self, client: TestClient, auth_headers: dict):
-        """Malformed UUID should return 404, not 500."""
+        """Malformed UUID should return 422."""
         response = client.get("/ebooks/not-a-uuid", headers=auth_headers)
 
-        assert response.status_code == 404
+        assert response.status_code == 422
 
     def test_delete_ebook_malformed_uuid(self, client: TestClient, auth_headers: dict):
-        """Delete with malformed UUID should return 404."""
+        """Delete with malformed UUID should return 422."""
         response = client.delete("/ebooks/not-a-uuid", headers=auth_headers)
 
-        assert response.status_code == 404
+        assert response.status_code == 422
 
     def test_download_ebook_malformed_uuid(self, client: TestClient):
-        """Download with malformed UUID should return 404."""
+        """Download with malformed UUID should return 422."""
         response = client.get("/ebooks/not-a-uuid/download")
 
-        assert response.status_code == 404
+        assert response.status_code == 422
 
     def test_generate_ebook_malformed_manuscript_uuid(
         self, client: TestClient, auth_headers: dict
     ):
-        """Generate ebook with malformed manuscript UUID should return 404."""
+        """Generate ebook with malformed manuscript UUID should return 422."""
         response = client.post(
             "/ebooks/manuscripts/not-a-uuid/generate",
             headers=auth_headers,
             json={"output_formats": ["epub"]},
         )
 
-        assert response.status_code == 404
+        assert response.status_code == 422
 
 
 
@@ -820,13 +843,13 @@ class TestEbookVisibility:
         assert response.status_code == 404
 
     def test_publish_malformed_uuid(self, client: TestClient, auth_headers: dict):
-        assert client.post("/ebooks/not-a-uuid/publish", headers=auth_headers).status_code == 404
+        assert client.post("/ebooks/not-a-uuid/publish", headers=auth_headers).status_code == 422
 
     def test_unlist_malformed_uuid(self, client: TestClient, auth_headers: dict):
-        assert client.post("/ebooks/not-a-uuid/unlist", headers=auth_headers).status_code == 404
+        assert client.post("/ebooks/not-a-uuid/unlist", headers=auth_headers).status_code == 422
 
     def test_make_private_malformed_uuid(self, client: TestClient, auth_headers: dict):
-        assert client.post("/ebooks/not-a-uuid/make-private", headers=auth_headers).status_code == 404
+        assert client.post("/ebooks/not-a-uuid/make-private", headers=auth_headers).status_code == 422
 
     def test_publish_requires_auth(self, client: TestClient, ebook_id: str):
         assert client.post(f"/ebooks/{ebook_id}/publish").status_code == 401

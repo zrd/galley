@@ -2,12 +2,13 @@
 Tests for service layer using SQLAlchemy repositories.
 """
 
+from unittest.mock import AsyncMock, patch
 from uuid import uuid4
 
 import pytest
 from sqlalchemy.orm import Session
 
-from app.domain import ManuscriptNotFound, ManuscriptState, OutputFormat, SampleNotFound, SourceFormat, TagNotFound
+from app.domain import Manuscript, ManuscriptNotFound, ManuscriptState, OutputFormat, SampleNotFound, SourceFormat, TagNotFound
 from app.repositories import (
     SQLAlchemyAuthorRepository,
     SQLAlchemyEbookRepository,
@@ -17,6 +18,20 @@ from app.repositories import (
 )
 from app.schemas.ebook import EbookUpdate
 from app.services import AuthorService, EbookService, ManuscriptService, SampleService, TagService
+
+
+def _make_manuscript(
+    repo: SQLAlchemyManuscriptRepository,
+    author_id,
+    title: str = "Test Book",
+    source_format: SourceFormat = SourceFormat.EPUB,
+) -> Manuscript:
+    return repo.add(Manuscript(
+        author_id=author_id,
+        title=title,
+        source_format=source_format,
+        source_file_key="manuscripts/test.epub",
+    ))
 
 
 class TestAuthorService:
@@ -102,14 +117,18 @@ class TestManuscriptService:
         db_session.commit()
         return author.id
 
-    def test_create_manuscript(self, service: ManuscriptService, db_session: Session, author_id):
-        manuscript = service.create(
-            author_id=author_id,
-            title="My Book",
-            source_format=SourceFormat.EPUB,
-            source_file_key="manuscripts/book.epub",
-            description="A great book",
-        )
+    @pytest.mark.asyncio
+    async def test_create_manuscript(self, service: ManuscriptService, db_session: Session, author_id):
+        mock_storage = AsyncMock()
+        with patch("app.services.manuscript_service.get_storage_backend", return_value=mock_storage):
+            manuscript = await service.create(
+                author_id=author_id,
+                title="My Book",
+                source_format=SourceFormat.EPUB,
+                filename="book.epub",
+                content=b"fake content",
+                description="A great book",
+            )
         db_session.commit()
 
         assert manuscript.title == "My Book"
@@ -117,17 +136,13 @@ class TestManuscriptService:
         assert manuscript.state == ManuscriptState.DRAFT
 
     def test_get_manuscript(self, service: ManuscriptService, db_session: Session, author_id):
-        created = service.create(
-            author_id=author_id,
-            title="Get Test",
-            source_format=SourceFormat.PDF,
-            source_file_key="manuscripts/book.pdf",
-        )
+        repo = SQLAlchemyManuscriptRepository(db_session)
+        manuscript = _make_manuscript(repo, author_id, title="Get Test", source_format=SourceFormat.PDF)
         db_session.commit()
 
-        retrieved = service.get(created.id)
+        retrieved = service.get(manuscript.id)
 
-        assert retrieved.id == created.id
+        assert retrieved.id == manuscript.id
         assert retrieved.title == "Get Test"
 
     def test_get_manuscript_not_found(self, service: ManuscriptService):
@@ -135,7 +150,6 @@ class TestManuscriptService:
             service.get(uuid4())
 
     def test_list_by_author(self, service: ManuscriptService, db_session: Session):
-        # Create two authors
         author_repo = SQLAlchemyAuthorRepository(db_session)
         author_service = AuthorService(author_repo)
         author1 = author_service.create(
@@ -150,18 +164,9 @@ class TestManuscriptService:
         )
         db_session.commit()
 
-        service.create(
-            author_id=author1.id,
-            title="Author 1 Book",
-            source_format=SourceFormat.EPUB,
-            source_file_key="m/1.epub",
-        )
-        service.create(
-            author_id=author2.id,
-            title="Author 2 Book",
-            source_format=SourceFormat.EPUB,
-            source_file_key="m/2.epub",
-        )
+        ms_repo = SQLAlchemyManuscriptRepository(db_session)
+        _make_manuscript(ms_repo, author1.id, title="Author 1 Book")
+        _make_manuscript(ms_repo, author2.id, title="Author 2 Book")
         db_session.commit()
 
         author1_manuscripts = service.list_by_author(author1.id)
@@ -173,16 +178,12 @@ class TestManuscriptService:
         assert author2_manuscripts[0].title == "Author 2 Book"
 
     def test_update_metadata(self, service: ManuscriptService, db_session: Session, author_id):
-        created = service.create(
-            author_id=author_id,
-            title="Original",
-            source_format=SourceFormat.EPUB,
-            source_file_key="m/book.epub",
-        )
+        repo = SQLAlchemyManuscriptRepository(db_session)
+        manuscript = _make_manuscript(repo, author_id, title="Original")
         db_session.commit()
 
         updated = service.update_metadata(
-            created.id,
+            manuscript.id,
             author_id=author_id,
             title="Updated Title",
             description="New description",
@@ -192,14 +193,18 @@ class TestManuscriptService:
         assert updated.title == "Updated Title"
         assert updated.description == "New description"
 
-    def test_create_with_tag_names(self, service: ManuscriptService, db_session: Session, author_id):
-        manuscript = service.create(
-            author_id=author_id,
-            title="Tagged Book",
-            source_format=SourceFormat.EPUB,
-            source_file_key="m/tagged.epub",
-            tag_names=["Hard Sci-Fi", "Adventure"],
-        )
+    @pytest.mark.asyncio
+    async def test_create_with_tag_names(self, service: ManuscriptService, db_session: Session, author_id):
+        mock_storage = AsyncMock()
+        with patch("app.services.manuscript_service.get_storage_backend", return_value=mock_storage):
+            manuscript = await service.create(
+                author_id=author_id,
+                title="Tagged Book",
+                source_format=SourceFormat.EPUB,
+                filename="tagged.epub",
+                content=b"fake content",
+                tag_names=["Hard Sci-Fi", "Adventure"],
+            )
         db_session.commit()
 
         assert len(manuscript.tags) == 2
@@ -207,17 +212,15 @@ class TestManuscriptService:
         assert slugs == {"hard-sci-fi", "adventure"}
 
     def test_update_metadata_with_tag_names(self, service: ManuscriptService, db_session: Session, author_id):
-        created = service.create(
-            author_id=author_id,
-            title="Book",
-            source_format=SourceFormat.EPUB,
-            source_file_key="m/book.epub",
-            tag_names=["Fantasy"],
-        )
+        ms_repo = SQLAlchemyManuscriptRepository(db_session)
+        tag_repo = SQLAlchemyTagRepository(db_session)
+        manuscript = _make_manuscript(ms_repo, author_id, title="Book")
+        initial_tag = tag_repo.get_or_create("Fantasy", author_id)
+        ms_repo.set_tags(manuscript.id, [initial_tag.id])
         db_session.commit()
 
         updated = service.update_metadata(
-            created.id,
+            manuscript.id,
             author_id=author_id,
             tag_names=["Horror", "Thriller"],
         )
@@ -230,17 +233,15 @@ class TestManuscriptService:
     def test_update_metadata_without_tag_names_preserves_tags(
         self, service: ManuscriptService, db_session: Session, author_id
     ):
-        created = service.create(
-            author_id=author_id,
-            title="Book",
-            source_format=SourceFormat.EPUB,
-            source_file_key="m/book.epub",
-            tag_names=["Fantasy"],
-        )
+        ms_repo = SQLAlchemyManuscriptRepository(db_session)
+        tag_repo = SQLAlchemyTagRepository(db_session)
+        manuscript = _make_manuscript(ms_repo, author_id, title="Book")
+        initial_tag = tag_repo.get_or_create("Fantasy", author_id)
+        ms_repo.set_tags(manuscript.id, [initial_tag.id])
         db_session.commit()
 
         updated = service.update_metadata(
-            created.id,
+            manuscript.id,
             author_id=author_id,
             title="Updated Title",
         )
@@ -250,21 +251,16 @@ class TestManuscriptService:
         assert updated.tags[0].slug == "fantasy"
 
     def test_mark_ready(self, service: ManuscriptService, db_session: Session, author_id):
-        created = service.create(
-            author_id=author_id,
-            title="Ready Book",
-            source_format=SourceFormat.EPUB,
-            source_file_key="m/book.epub",
-        )
+        repo = SQLAlchemyManuscriptRepository(db_session)
+        manuscript = _make_manuscript(repo, author_id, title="Ready Book")
         db_session.commit()
 
-        ready = service.mark_ready(created.id)
+        ready = service.mark_ready(manuscript.id)
         db_session.commit()
 
         assert ready.state == ManuscriptState.READY
 
     def test_check_ownership(self, service: ManuscriptService, db_session: Session):
-        # Create two authors
         author_repo = SQLAlchemyAuthorRepository(db_session)
         author_service = AuthorService(author_repo)
         owner = author_service.create(
@@ -279,32 +275,107 @@ class TestManuscriptService:
         )
         db_session.commit()
 
-        created = service.create(
-            author_id=owner.id,
-            title="Owned Book",
-            source_format=SourceFormat.EPUB,
-            source_file_key="m/book.epub",
-        )
+        repo = SQLAlchemyManuscriptRepository(db_session)
+        manuscript = _make_manuscript(repo, owner.id, title="Owned Book")
         db_session.commit()
 
-        assert service.check_ownership(created.id, owner.id) is True
-        assert service.check_ownership(created.id, other.id) is False
+        assert service.check_ownership(manuscript.id, owner.id) is True
+        assert service.check_ownership(manuscript.id, other.id) is False
         assert service.check_ownership(uuid4(), owner.id) is False
 
     def test_delete_manuscript(self, service: ManuscriptService, db_session: Session, author_id):
-        created = service.create(
-            author_id=author_id,
-            title="Delete Me",
-            source_format=SourceFormat.EPUB,
-            source_file_key="m/book.epub",
-        )
+        repo = SQLAlchemyManuscriptRepository(db_session)
+        manuscript = _make_manuscript(repo, author_id, title="Delete Me")
         db_session.commit()
 
-        service.delete(created.id)
+        service.delete(manuscript.id)
         db_session.commit()
 
         with pytest.raises(ManuscriptNotFound):
-            service.get(created.id)
+            service.get(manuscript.id)
+
+    @pytest.mark.asyncio
+    async def test_update_source_deletes_old_file(self, service: ManuscriptService, db_session: Session, author_id):
+        repo = SQLAlchemyManuscriptRepository(db_session)
+        manuscript = _make_manuscript(repo, author_id)
+        db_session.commit()
+        old_key = manuscript.source_file_key
+
+        mock_storage = AsyncMock()
+        with patch("app.services.manuscript_service.get_storage_backend", return_value=mock_storage):
+            await service.update_source(
+                manuscript_id=manuscript.id,
+                author_id=author_id,
+                source_format=SourceFormat.EPUB,
+                filename="new.epub",
+                content=b"new content",
+            )
+
+        mock_storage.delete.assert_awaited_once_with(old_key)
+
+    @pytest.mark.asyncio
+    async def test_update_cover_deletes_old_cover(self, service: ManuscriptService, db_session: Session, author_id):
+        ms_repo = SQLAlchemyManuscriptRepository(db_session)
+        manuscript = _make_manuscript(ms_repo, author_id)
+        manuscript.set_cover("covers/old_cover.jpg")
+        ms_repo.update(manuscript)
+        db_session.commit()
+
+        mock_storage = AsyncMock()
+        with patch("app.services.manuscript_service.get_storage_backend", return_value=mock_storage):
+            await service.update_cover(
+                manuscript_id=manuscript.id,
+                author_id=author_id,
+                cover_image_filename="new_cover.jpg",
+                cover_image_content=b"\xff\xd8\xff" + b"\x00" * 17,
+            )
+
+        mock_storage.delete.assert_awaited_once_with("covers/old_cover.jpg")
+
+    @pytest.mark.asyncio
+    async def test_update_cover_skips_delete_if_no_existing_cover(
+        self, service: ManuscriptService, db_session: Session, author_id
+    ):
+        repo = SQLAlchemyManuscriptRepository(db_session)
+        manuscript = _make_manuscript(repo, author_id)
+        db_session.commit()
+
+        mock_storage = AsyncMock()
+        with patch("app.services.manuscript_service.get_storage_backend", return_value=mock_storage):
+            await service.update_cover(
+                manuscript_id=manuscript.id,
+                author_id=author_id,
+                cover_image_filename="cover.jpg",
+                cover_image_content=b"\xff\xd8\xff" + b"\x00" * 17,
+            )
+
+        mock_storage.delete.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_remove_cover_deletes_file(self, service: ManuscriptService, db_session: Session, author_id):
+        ms_repo = SQLAlchemyManuscriptRepository(db_session)
+        manuscript = _make_manuscript(ms_repo, author_id)
+        manuscript.set_cover("covers/cover.jpg")
+        ms_repo.update(manuscript)
+        db_session.commit()
+
+        mock_storage = AsyncMock()
+        with patch("app.services.manuscript_service.get_storage_backend", return_value=mock_storage):
+            await service.remove_cover(manuscript.id)
+
+        mock_storage.delete.assert_awaited_once_with("covers/cover.jpg")
+
+    @pytest.mark.asyncio
+    async def test_remove_cover_no_op_if_no_cover(self, service: ManuscriptService, db_session: Session, author_id):
+        repo = SQLAlchemyManuscriptRepository(db_session)
+        manuscript = _make_manuscript(repo, author_id)
+        db_session.commit()
+
+        mock_storage = AsyncMock()
+        with patch("app.services.manuscript_service.get_storage_backend", return_value=mock_storage):
+            await service.remove_cover(manuscript.id)
+
+        mock_storage.delete.assert_not_awaited()
 
 
 class TestSampleService:
@@ -326,13 +397,7 @@ class TestSampleService:
         db_session.commit()
 
         repo = SQLAlchemyManuscriptRepository(db_session)
-        ms_service = ManuscriptService(repo)
-        manuscript = ms_service.create(
-            author_id=author.id,
-            title="Test Manuscript",
-            source_format=SourceFormat.EPUB,
-            source_file_key="m/test.epub",
-        )
+        manuscript = _make_manuscript(repo, author.id, title="Test Manuscript")
         db_session.commit()
         return manuscript.id
 
@@ -370,7 +435,6 @@ class TestSampleService:
             service.get(uuid4())
 
     def test_list_by_manuscript(self, service: SampleService, db_session: Session):
-        # Create author first
         author_repo = SQLAlchemyAuthorRepository(db_session)
         author_service = AuthorService(author_repo)
         author = author_service.create(
@@ -380,21 +444,9 @@ class TestSampleService:
         )
         db_session.commit()
 
-        # Create two manuscripts
-        repo = SQLAlchemyManuscriptRepository(db_session)
-        ms = ManuscriptService(repo)
-        m1 = ms.create(
-            author_id=author.id,
-            title="M1",
-            source_format=SourceFormat.EPUB,
-            source_file_key="m/1.epub",
-        )
-        m2 = ms.create(
-            author_id=author.id,
-            title="M2",
-            source_format=SourceFormat.EPUB,
-            source_file_key="m/2.epub",
-        )
+        ms_repo = SQLAlchemyManuscriptRepository(db_session)
+        m1 = _make_manuscript(ms_repo, author.id, title="M1")
+        m2 = _make_manuscript(ms_repo, author.id, title="M2")
         db_session.commit()
 
         service.create(
@@ -459,12 +511,7 @@ class TestEbookService:
         db_session.commit()
 
         manuscript_repo = SQLAlchemyManuscriptRepository(db_session)
-        manuscript = ManuscriptService(manuscript_repo).create(
-            author_id=author.id,
-            title="Test Book",
-            source_format=SourceFormat.EPUB,
-            source_file_key="m/test.epub",
-        )
+        manuscript = _make_manuscript(manuscript_repo, author.id, title="Test Book")
         db_session.commit()
         return manuscript.id
 
@@ -562,12 +609,8 @@ class TestTagRepository:
 
     @pytest.fixture
     def manuscript_id(self, db_session: Session, author_id):
-        manuscript = ManuscriptService(SQLAlchemyManuscriptRepository(db_session)).create(
-            author_id=author_id,
-            title="Test Book",
-            source_format=SourceFormat.EPUB,
-            source_file_key="m/test.epub",
-        )
+        ms_repo = SQLAlchemyManuscriptRepository(db_session)
+        manuscript = _make_manuscript(ms_repo, author_id)
         db_session.commit()
         return manuscript.id
 
@@ -743,22 +786,12 @@ class TestTagRepository:
                 email=email, password_hash="hash", display_name=f"Author {i}"
             )
             db_session.commit()
-            m = ManuscriptService(SQLAlchemyManuscriptRepository(db_session)).create(
-                author_id=author.id,
-                title=f"Book {i}",
-                source_format=SourceFormat.EPUB,
-                source_file_key=f"m/book{i}.epub",
-            )
+            m = _make_manuscript(ms_repo, author.id, title=f"Book {i}")
             db_session.commit()
             ms_repo.set_tags(m.id, [t_popular.id])
             db_session.commit()
 
-        m_rare = ManuscriptService(SQLAlchemyManuscriptRepository(db_session)).create(
-            author_id=author_id,
-            title="Rare Book",
-            source_format=SourceFormat.EPUB,
-            source_file_key="m/rare.epub",
-        )
+        m_rare = _make_manuscript(ms_repo, author_id, title="Rare Book")
         db_session.commit()
         ms_repo.set_tags(m_rare.id, [t_rare.id])
         db_session.commit()

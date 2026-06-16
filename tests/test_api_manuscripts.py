@@ -324,7 +324,7 @@ class TestMarkReady:
         # Try again
         response = client.post(f"/manuscripts/{manuscript_id}/ready", headers=auth_headers)
 
-        assert response.status_code == 400
+        assert response.status_code == 409
 
 
 class TestMarkDraft:
@@ -358,7 +358,7 @@ class TestMarkDraft:
 
         response = client.post(f"/manuscripts/{manuscript_id}/draft", headers=auth_headers)
 
-        assert response.status_code == 400
+        assert response.status_code == 409
 
     def test_mark_draft_from_archived_fails(
         self, client: TestClient, auth_headers: dict, sample_epub: bytes
@@ -375,7 +375,7 @@ class TestMarkDraft:
 
         response = client.post(f"/manuscripts/{manuscript_id}/draft", headers=auth_headers)
 
-        assert response.status_code == 400
+        assert response.status_code == 409
 
     def test_mark_draft_wrong_owner(
         self, client: TestClient, auth_headers: dict, sample_epub: bytes
@@ -408,7 +408,7 @@ class TestMarkDraft:
     def test_mark_draft_malformed_uuid(self, client: TestClient, auth_headers: dict):
         response = client.post("/manuscripts/not-a-uuid/draft", headers=auth_headers)
 
-        assert response.status_code == 404
+        assert response.status_code == 422
 
     def test_mark_draft_nonexistent(self, client: TestClient, auth_headers: dict):
         import uuid
@@ -486,38 +486,38 @@ class TestInputValidation:
     """Tests for malformed input handling in manuscript endpoints."""
 
     def test_get_manuscript_malformed_uuid(self, client: TestClient, auth_headers: dict):
-        """Malformed UUID should return 404, not 500."""
+        """Malformed UUID should return 422."""
         response = client.get("/manuscripts/not-a-uuid", headers=auth_headers)
 
-        assert response.status_code == 404
+        assert response.status_code == 422
 
     def test_get_manuscript_partial_uuid(self, client: TestClient, auth_headers: dict):
-        """Partial UUID should return 404."""
+        """Partial UUID should return 422."""
         response = client.get("/manuscripts/12345", headers=auth_headers)
 
-        assert response.status_code == 404
+        assert response.status_code == 422
 
     def test_update_manuscript_malformed_uuid(self, client: TestClient, auth_headers: dict):
-        """Update with malformed UUID should return 404."""
+        """Update with malformed UUID should return 422."""
         response = client.put(
             "/manuscripts/not-a-uuid",
             headers=auth_headers,
             json={"title": "New Title"},
         )
 
-        assert response.status_code == 404
+        assert response.status_code == 422
 
     def test_delete_manuscript_malformed_uuid(self, client: TestClient, auth_headers: dict):
-        """Delete with malformed UUID should return 404."""
+        """Delete with malformed UUID should return 422."""
         response = client.delete("/manuscripts/not-a-uuid", headers=auth_headers)
 
-        assert response.status_code == 404
+        assert response.status_code == 422
 
     def test_mark_ready_malformed_uuid(self, client: TestClient, auth_headers: dict):
-        """Mark ready with malformed UUID should return 404."""
+        """Mark ready with malformed UUID should return 422."""
         response = client.post("/manuscripts/not-a-uuid/ready", headers=auth_headers)
 
-        assert response.status_code == 404
+        assert response.status_code == 422
 
     def test_create_manuscript_whitespace_title(
         self, client: TestClient, auth_headers: dict, sample_epub: bytes
@@ -812,7 +812,7 @@ class TestArchiveManuscript:
         # Try to archive again
         response = client.post(f"/manuscripts/{manuscript_id}/archive", headers=auth_headers)
 
-        assert response.status_code == 400
+        assert response.status_code == 409
 
     def test_archive_wrong_owner(self, client: TestClient, sample_epub: bytes):
         """Archiving another user's manuscript should return 404."""
@@ -853,9 +853,9 @@ class TestArchiveManuscript:
         assert response.status_code == 404
 
     def test_archive_malformed_uuid(self, client: TestClient, auth_headers: dict):
-        """Archive with malformed UUID should return 404."""
+        """Archive with malformed UUID should return 422."""
         response = client.post("/manuscripts/not-a-uuid/archive", headers=auth_headers)
-        assert response.status_code == 404
+        assert response.status_code == 422
 
     def test_unarchive_manuscript_success(
         self, client: TestClient, auth_headers: dict, sample_epub: bytes
@@ -895,7 +895,7 @@ class TestArchiveManuscript:
         # Try to unarchive
         response = client.post(f"/manuscripts/{manuscript_id}/unarchive", headers=auth_headers)
 
-        assert response.status_code == 400
+        assert response.status_code == 409
 
     def test_unarchive_wrong_owner(self, client: TestClient, sample_epub: bytes):
         """Unarchiving another user's manuscript should return 404."""
@@ -937,9 +937,9 @@ class TestArchiveManuscript:
         assert response.status_code == 404
 
     def test_unarchive_malformed_uuid(self, client: TestClient, auth_headers: dict):
-        """Unarchive with malformed UUID should return 404."""
+        """Unarchive with malformed UUID should return 422."""
         response = client.post("/manuscripts/not-a-uuid/unarchive", headers=auth_headers)
-        assert response.status_code == 404
+        assert response.status_code == 422
 
 
 @pytest.fixture
@@ -1229,6 +1229,25 @@ class TestGetCover:
         )
         response = client.get(f"/manuscripts/{manuscript_id}/cover")
         assert response.status_code == 200
+
+    def test_get_cover_missing_file(
+        self,
+        client: TestClient,
+        auth_headers: dict,
+        manuscript_id: str,
+        sample_jpeg: bytes,
+        test_storage: LocalStorageBackend,
+    ):
+        upload = client.put(
+            f"/manuscripts/{manuscript_id}/cover",
+            headers=auth_headers,
+            files={"file": ("cover.jpg", io.BytesIO(sample_jpeg), "image/jpeg")},
+        )
+        key = upload.json()["cover_image_key"]
+        asyncio.run(test_storage.delete(key))
+
+        response = client.get(f"/manuscripts/{manuscript_id}/cover")
+        assert response.status_code == 404
 
 
 class TestDeleteCover:

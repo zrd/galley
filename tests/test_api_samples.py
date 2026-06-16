@@ -386,42 +386,42 @@ class TestInputValidation:
     """Tests for malformed input handling in sample endpoints."""
 
     def test_get_sample_malformed_uuid(self, client: TestClient, auth_headers: dict):
-        """Malformed UUID should return 404, not 500."""
+        """Malformed UUID should return 422."""
         response = client.get("/samples/not-a-uuid", headers=auth_headers)
 
-        assert response.status_code == 404
+        assert response.status_code == 422
 
     def test_update_sample_malformed_uuid(self, client: TestClient, auth_headers: dict):
-        """Update with malformed UUID should return 404."""
+        """Update with malformed UUID should return 422."""
         response = client.put(
             "/samples/not-a-uuid",
             headers=auth_headers,
             json={"title": "New Title"},
         )
 
-        assert response.status_code == 404
+        assert response.status_code == 422
 
     def test_delete_sample_malformed_uuid(self, client: TestClient, auth_headers: dict):
-        """Delete with malformed UUID should return 404."""
+        """Delete with malformed UUID should return 422."""
         response = client.delete("/samples/not-a-uuid", headers=auth_headers)
 
-        assert response.status_code == 404
+        assert response.status_code == 422
 
     def test_list_samples_malformed_manuscript_uuid(
         self, client: TestClient, auth_headers: dict
     ):
-        """List samples with malformed manuscript UUID should return 404."""
+        """List samples with malformed manuscript UUID should return 422."""
         response = client.get(
             "/samples/manuscripts/not-a-uuid/samples",
             headers=auth_headers,
         )
 
-        assert response.status_code == 404
+        assert response.status_code == 422
 
     def test_create_sample_malformed_manuscript_uuid(
         self, client: TestClient, auth_headers: dict
     ):
-        """Create sample with malformed manuscript UUID should return 404."""
+        """Create sample with malformed manuscript UUID should return 422."""
         response = client.post(
             "/samples/manuscripts/not-a-uuid/samples",
             headers=auth_headers,
@@ -432,5 +432,5 @@ class TestInputValidation:
             },
         )
 
-        assert response.status_code == 404
+        assert response.status_code == 422
 

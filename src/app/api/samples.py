@@ -59,25 +59,19 @@ def get_generation_service(db: Annotated[Session, Depends(get_db)]) -> Generatio
     status_code=status.HTTP_201_CREATED,
 )
 def create_sample(
-    manuscript_id: str,
+    manuscript_id: UUID,
     sample_in: SampleCreate,
     author_id: CurrentAuthorId,
     manuscript_service: Annotated[ManuscriptService, Depends(get_manuscript_service)],
     sample_service: Annotated[SampleService, Depends(get_sample_service)],
-    db: Annotated[Session, Depends(get_db)],
 ) -> SampleRead:
     """Create a new sample definition for a manuscript."""
-    try:
-        mid = UUID(manuscript_id)
-    except ValueError:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Manuscript not found")
-
     # Verify manuscript ownership
-    if not manuscript_service.check_ownership(mid, author_id):
+    if not manuscript_service.check_ownership(manuscript_id, author_id):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Manuscript not found")
 
     sample = sample_service.create(
-        manuscript_id=mid,
+        manuscript_id=manuscript_id,
         title=sample_in.title,
         excerpt_start=sample_in.excerpt_start,
         excerpt_end=sample_in.excerpt_end,
@@ -89,40 +83,30 @@ def create_sample(
 
 @router.get("/manuscripts/{manuscript_id}/samples", response_model=list[SampleRead])
 def list_samples(
-    manuscript_id: str,
+    manuscript_id: UUID,
     author_id: CurrentAuthorId,
     manuscript_service: Annotated[ManuscriptService, Depends(get_manuscript_service)],
     sample_service: Annotated[SampleService, Depends(get_sample_service)],
     include_deleted: Annotated[bool, Query()] = False,
 ) -> list[SampleRead]:
     """List all samples for a manuscript."""
-    try:
-        mid = UUID(manuscript_id)
-    except ValueError:
+    if not manuscript_service.check_ownership(manuscript_id, author_id, include_deleted=include_deleted):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Manuscript not found")
 
-    if not manuscript_service.check_ownership(mid, author_id, include_deleted=include_deleted):
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Manuscript not found")
-
-    samples = sample_service.list_by_manuscript(mid, include_deleted=include_deleted)
+    samples = sample_service.list_by_manuscript(manuscript_id, include_deleted=include_deleted)
     return [SampleRead.model_validate(s) for s in samples]
 
 
 @router.get("/{sample_id}", response_model=SampleRead)
 def get_sample(
-    sample_id: str,
+    sample_id: UUID,
     author_id: CurrentAuthorId,
     manuscript_service: Annotated[ManuscriptService, Depends(get_manuscript_service)],
     sample_service: Annotated[SampleService, Depends(get_sample_service)],
 ) -> SampleRead:
     """Get a specific sample definition."""
     try:
-        sid = UUID(sample_id)
-    except ValueError:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Sample not found")
-
-    try:
-        sample = sample_service.get(sid)
+        sample = sample_service.get(sample_id)
     except SampleNotFound:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Sample not found")
 
@@ -135,21 +119,15 @@ def get_sample(
 
 @router.put("/{sample_id}", response_model=SampleRead)
 def update_sample(
-    sample_id: str,
+    sample_id: UUID,
     update_in: SampleUpdate,
     author_id: CurrentAuthorId,
     manuscript_service: Annotated[ManuscriptService, Depends(get_manuscript_service)],
     sample_service: Annotated[SampleService, Depends(get_sample_service)],
-    db: Annotated[Session, Depends(get_db)],
 ) -> SampleRead:
     """Update a sample definition."""
     try:
-        sid = UUID(sample_id)
-    except ValueError:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Sample not found")
-
-    try:
-        sample = sample_service.get(sid)
+        sample = sample_service.get(sample_id)
     except SampleNotFound:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Sample not found")
 
@@ -157,7 +135,7 @@ def update_sample(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Sample not found")
 
     sample = sample_service.update(
-        sid,
+        sample_id,
         title=update_in.title,
         excerpt_start=update_in.excerpt_start,
         excerpt_end=update_in.excerpt_end,
@@ -169,74 +147,56 @@ def update_sample(
 
 @router.delete("/{sample_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_sample(
-    sample_id: str,
+    sample_id: UUID,
     author_id: CurrentAuthorId,
     manuscript_service: Annotated[ManuscriptService, Depends(get_manuscript_service)],
     sample_service: Annotated[SampleService, Depends(get_sample_service)],
-    db: Annotated[Session, Depends(get_db)],
 ) -> None:
     """Soft delete a sample definition and its generated ebooks."""
     try:
-        sid = UUID(sample_id)
-    except ValueError:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Sample not found")
-
-    try:
-        sample = sample_service.get(sid)
+        sample = sample_service.get(sample_id)
     except SampleNotFound:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Sample not found")
 
     if not manuscript_service.check_ownership(sample.manuscript_id, author_id):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Sample not found")
 
-    sample_service.soft_delete(sid)
+    sample_service.soft_delete(sample_id)
 
 
 @router.post("/{sample_id}/restore", response_model=SampleRead)
 def restore_sample(
-    sample_id: str,
+    sample_id: UUID,
     author_id: CurrentAuthorId,
     manuscript_service: Annotated[ManuscriptService, Depends(get_manuscript_service)],
     sample_service: Annotated[SampleService, Depends(get_sample_service)],
-    db: Annotated[Session, Depends(get_db)],
 ) -> SampleRead:
     """Restore a soft-deleted sample and its generated ebooks."""
     try:
-        sid = UUID(sample_id)
-    except ValueError:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Sample not found")
-
-    try:
-        sample = sample_service.get(sid, include_deleted=True)
+        sample = sample_service.get(sample_id, include_deleted=True)
     except SampleNotFound:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Sample not found")
 
     if not manuscript_service.check_ownership(sample.manuscript_id, author_id, include_deleted=True):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Sample not found")
 
-    sample_service.restore(sid)
-    sample = sample_service.get(sid)
+    sample_service.restore(sample_id)
+    sample = sample_service.get(sample_id)
     return SampleRead.model_validate(sample)
 
 
 @router.post("/{sample_id}/generate", response_model=list[EbookRead])
 async def generate_sample_ebooks(
-    sample_id: str,
+    sample_id: UUID,
     generate_in: EbookGenerateRequest,
     author_id: CurrentAuthorId,
     manuscript_service: Annotated[ManuscriptService, Depends(get_manuscript_service)],
     sample_service: Annotated[SampleService, Depends(get_sample_service)],
     generation_service: Annotated[GenerationService, Depends(get_generation_service)],
-    db: Annotated[Session, Depends(get_db)],
 ) -> list[EbookRead]:
     """Generate sample ebooks in the requested formats."""
     try:
-        sid = UUID(sample_id)
-    except ValueError:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Sample not found")
-
-    try:
-        sample = sample_service.get(sid)
+        sample = sample_service.get(sample_id)
     except SampleNotFound:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Sample not found")
 

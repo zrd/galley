@@ -33,7 +33,6 @@ def get_author_service(db: Annotated[Session, Depends(get_db)]) -> AuthorService
 def register(
     author_in: AuthorCreate,
     service: Annotated[AuthorService, Depends(get_author_service)],
-    db: Annotated[Session, Depends(get_db)],
 ) -> TokenResponse:
     """
     Register a new author account.

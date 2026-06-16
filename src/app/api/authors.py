@@ -37,7 +37,6 @@ def update_current_author(
     author_id: CurrentAuthorId,
     update_in: AuthorUpdate,
     service: Annotated[AuthorService, Depends(get_author_service)],
-    db: Annotated[Session, Depends(get_db)],
 ) -> AuthorRead:
     """Update the current authenticated author's profile."""
     author = service.update(author_id, display_name=update_in.display_name)

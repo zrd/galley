@@ -10,17 +10,17 @@ from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
 from app.db import get_db
-from app.domain import AuthorizationError, ManuscriptNotFound, SourceFormat, InvalidStateTransition
+from app.domain import ManuscriptNotFound, SourceFormat, InvalidStateTransition
 from app.repositories import (
     SQLAlchemyEbookRepository,
     SQLAlchemyManuscriptRepository,
     SQLAlchemySampleRepository,
     SQLAlchemyTagRepository,
 )
-from app.schemas import ManuscriptCreate, ManuscriptListItem, ManuscriptRead, ManuscriptUpdate
+from app.schemas import ManuscriptListItem, ManuscriptRead, ManuscriptUpdate
 from app.security.auth import CurrentAuthorId
 from app.services import EbookService, ManuscriptService, SampleService
-from app.storage import generate_file_key, get_content_type_for_format, get_storage_backend, validate_image
+from app.storage import get_content_type_for_format, get_storage_backend
 
 router = APIRouter()
 
@@ -34,30 +34,16 @@ def get_manuscript_service(db: Annotated[Session, Depends(get_db)]) -> Manuscrip
     return ManuscriptService(manuscript_repo, sample_repo, ebook_repo, tag_repo)
 
 
-def get_sample_service(db: Annotated[Session, Depends(get_db)]) -> SampleService:
-    """Dependency to get a SampleService with database session."""
-    repo = SQLAlchemySampleRepository(db)
-    ebook_repo = SQLAlchemyEbookRepository(db)
-    return SampleService(repo, ebook_repo)
-
-
-def get_ebook_service(db: Annotated[Session, Depends(get_db)]) -> EbookService:
-    """Dependency to get an EbookService with database session."""
-    repo = SQLAlchemyEbookRepository(db)
-    return EbookService(repo)
-
-
 @router.post("/", response_model=ManuscriptRead, status_code=status.HTTP_201_CREATED)
 async def create_manuscript(
     author_id: CurrentAuthorId,
     title: Annotated[str, Form(min_length=1)],
     source_format: Annotated[SourceFormat, Form()],
     file: Annotated[UploadFile, File()],
+    service: Annotated[ManuscriptService, Depends(get_manuscript_service)],
     description: Annotated[str | None, Form()] = None,
     genre_ids: list[int] = Form(default=[]),
     tag_names: list[str] = Form(default=[]),
-    service: ManuscriptService = Depends(get_manuscript_service),
-    db: Session = Depends(get_db),
 ) -> ManuscriptRead:
     """
     Upload a new manuscript.
@@ -71,7 +57,7 @@ async def create_manuscript(
     # Validate title is not whitespace only
     if not title.strip():
         raise HTTPException(
-            status_code=422,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail=[{"loc": ["body", "title"], "msg": "title cannot be whitespace only", "type": "value_error"}],
         )
 
@@ -83,20 +69,13 @@ async def create_manuscript(
             detail="File is empty",
         )
 
-    # Generate storage key and upload file
     filename = file.filename or f"manuscript.{source_format.value}"
-    file_key = generate_file_key(author_id, filename, "manuscripts")
-    content_type = get_content_type_for_format(source_format.value)
-
-    storage = get_storage_backend()
-    await storage.upload(file_key, content, content_type)
-
-    # Create manuscript record
-    manuscript = service.create(
+    manuscript = await service.create(
         author_id=author_id,
         title=title,
         source_format=source_format,
-        source_file_key=file_key,
+        filename=filename,
+        content=content,
         description=description,
         genre_ids=genre_ids,
         tag_names=tag_names,
@@ -117,20 +96,13 @@ def list_manuscripts(
 
 @router.get("/{manuscript_id}", response_model=ManuscriptRead)
 def get_manuscript(
-    manuscript_id: str,
+    manuscript_id: UUID,
     author_id: CurrentAuthorId,
     service: Annotated[ManuscriptService, Depends(get_manuscript_service)],
 ) -> ManuscriptRead:
     """Get a specific manuscript by ID."""
-    from uuid import UUID
-
     try:
-        mid = UUID(manuscript_id)
-    except ValueError:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Manuscript not found")
-
-    try:
-        manuscript = service.get(mid)
+        manuscript = service.get(manuscript_id)
     except ManuscriptNotFound:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Manuscript not found")
 
@@ -142,27 +114,19 @@ def get_manuscript(
 
 @router.put("/{manuscript_id}", response_model=ManuscriptRead)
 def update_manuscript(
-    manuscript_id: str,
+    manuscript_id: UUID,
     update_in: ManuscriptUpdate,
     author_id: CurrentAuthorId,
     service: Annotated[ManuscriptService, Depends(get_manuscript_service)],
-    db: Annotated[Session, Depends(get_db)],
 ) -> ManuscriptRead:
     """Update manuscript metadata."""
-    from uuid import UUID
-
-    try:
-        mid = UUID(manuscript_id)
-    except ValueError:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Manuscript not found")
-
     # Verify ownership
-    if not service.check_ownership(mid, author_id):
+    if not service.check_ownership(manuscript_id, author_id):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Manuscript not found")
 
     try:
         manuscript = service.update_metadata(
-            mid,
+            manuscript_id,
             author_id,
             title=update_in.title,
             description=update_in.description,
@@ -177,57 +141,46 @@ def update_manuscript(
 
 @router.put("/{manuscript_id}/file", response_model=ManuscriptRead)
 async def update_manuscript_file(
-    manuscript_id: str,
+    manuscript_id: UUID,
     author_id: CurrentAuthorId,
     source_format: Annotated[SourceFormat, Form()],
     file: Annotated[UploadFile, File()],
     service: Annotated[ManuscriptService, Depends(get_manuscript_service)],
-    db: Annotated[Session, Depends(get_db)],
 ) -> ManuscriptRead:
     """
     Replace the manuscript source file.
 
     This will reset the manuscript state to DRAFT.
     """
-    from uuid import UUID
-
-    try:
-        mid = UUID(manuscript_id)
-    except ValueError:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Manuscript not found")
-
     # Verify ownership
-    if not service.check_ownership(mid, author_id):
+    if not service.check_ownership(manuscript_id, author_id):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Manuscript not found")
 
-    # Read and upload new file
     content = await file.read()
     if len(content) == 0:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="File is empty")
 
     filename = file.filename or f"manuscript.{source_format.value}"
-    file_key = generate_file_key(author_id, filename, "manuscripts")
-    content_type = get_content_type_for_format(source_format.value)
-
-    storage = get_storage_backend()
-    await storage.upload(file_key, content, content_type)
-
-    # Update manuscript with new file
     try:
-        manuscript = service.update_source(mid, file_key, source_format)
+        manuscript = await service.update_source(
+            manuscript_id=manuscript_id,
+            author_id=author_id,
+            source_format=source_format,
+            filename=filename,
+            content=content,
+        )
     except ManuscriptNotFound:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Manuscript not found")
 
     return ManuscriptRead.model_validate(manuscript)
 
 
-@router.put("/{manuscript_id}/cover", response_model=ManuscriptRead, status_code=status.HTTP_200_OK)
+@router.put("/{manuscript_id}/cover", response_model=ManuscriptRead)
 async def upload_cover(
     manuscript_id: UUID,
     author_id: CurrentAuthorId,
     file: Annotated[UploadFile, File()],
-    service: ManuscriptService = Depends(get_manuscript_service),
-    db: Session = Depends(get_db),
+    service: Annotated[ManuscriptService, Depends(get_manuscript_service)],
 ) -> ManuscriptRead:
     """
     Upload a new cover image.
@@ -239,49 +192,32 @@ async def upload_cover(
     if not service.check_ownership(manuscript_id, author_id):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Manuscript not found")
 
-    try:
-        manuscript = service.get(manuscript_id)
-    except ManuscriptNotFound:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Manuscript not found")
-
     content = await file.read()
     if len(content) == 0:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="File is empty",
         )
+    filename = file.filename or "cover"
     try:
-        content_type = validate_image(content)
+        updated = await service.update_cover(
+            manuscript_id=manuscript_id,
+            author_id=author_id,
+            cover_image_filename=filename,
+            cover_image_content=content,
+        )
+    except ManuscriptNotFound:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Manuscript not found")
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
-
-    format_extension = {"image/jpeg": "jpg", "image/png": "png"}[content_type]
-    if file.filename:
-        extension = file.filename.split(".")[-1]
-        if extension.lower() != format_extension:
-            file.filename = file.filename + f".{format_extension}"
-
-    filename = file.filename or f"cover.{format_extension}"
-    file_key = generate_file_key(author_id, filename, "covers")
-
-    storage = get_storage_backend()
-    await storage.upload(file_key, content, content_type)
-    existing_cover = manuscript.cover_image_key
-    updated = service.update_cover(manuscript_id, file_key)
-    if existing_cover:
-        try:
-            await storage.delete(existing_cover)
-        except Exception as e:
-            print(f"This is where I'd put my WARN: {e}\nlog, if I had one")
 
     return ManuscriptRead.model_validate(updated)
 
 
-@router.get("/{manuscript_id}/cover", response_class=FileResponse, status_code=status.HTTP_200_OK)
+@router.get("/{manuscript_id}/cover", response_class=FileResponse)
 async def get_cover(
     manuscript_id: UUID,
-    service: ManuscriptService = Depends(get_manuscript_service),
-    db: Session = Depends(get_db),
+    service: Annotated[ManuscriptService, Depends(get_manuscript_service)],
 ) -> FileResponse:
     try:
         manuscript = service.get(manuscript_id)
@@ -290,201 +226,150 @@ async def get_cover(
 
     if manuscript.cover_image_key:
         storage = get_storage_backend()
-        asset_path = await storage.get_url(manuscript.cover_image_key)
+        try:
+            asset_path = await storage.get_url(manuscript.cover_image_key)
+        except FileNotFoundError:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Cover not found")
+
         media_type = get_content_type_for_format(asset_path.split(".")[-1])
         return FileResponse(asset_path, media_type=media_type)
 
     raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Cover not found")
 
 
-@router.delete("/{manuscript_id}/cover", response_model=ManuscriptRead, status_code=status.HTTP_200_OK)
+@router.delete("/{manuscript_id}/cover", response_model=ManuscriptRead)
 async def delete_cover(
     manuscript_id: UUID,
     author_id: CurrentAuthorId,
-    service: ManuscriptService = Depends(get_manuscript_service),
-    db: Session = Depends(get_db),
+    service: Annotated[ManuscriptService, Depends(get_manuscript_service)],
 ) -> ManuscriptRead:
     if not service.check_ownership(manuscript_id, author_id):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Manuscript not found")
 
     try:
-        manuscript = service.get(manuscript_id)
-        existing_cover = manuscript.cover_image_key
-        updated = service.remove_cover(manuscript_id)
+        updated = await service.remove_cover(manuscript_id)
     except ManuscriptNotFound:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Manuscript not found")
-
-    storage = get_storage_backend()
-    if existing_cover:
-        try:
-            await storage.delete(existing_cover)
-        except Exception as e:
-            print(f"This is where I'd put my WARN: {e}\nlog, if I had one")
 
     return ManuscriptRead.model_validate(updated)
 
 
 @router.post("/{manuscript_id}/ready", response_model=ManuscriptRead)
 def mark_manuscript_ready(
-    manuscript_id: str,
+    manuscript_id: UUID,
     author_id: CurrentAuthorId,
     service: Annotated[ManuscriptService, Depends(get_manuscript_service)],
-    db: Annotated[Session, Depends(get_db)],
 ) -> ManuscriptRead:
     """Mark a manuscript as ready for ebook generation."""
-    from uuid import UUID
-
-    try:
-        mid = UUID(manuscript_id)
-    except ValueError:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Manuscript not found")
-
-    if not service.check_ownership(mid, author_id):
+    if not service.check_ownership(manuscript_id, author_id):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Manuscript not found")
 
     try:
-        manuscript = service.mark_ready(mid)
+        manuscript = service.mark_ready(manuscript_id)
     except ManuscriptNotFound:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Manuscript not found")
-    except Exception as e:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    except InvalidStateTransition as e:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
 
     return ManuscriptRead.model_validate(manuscript)
 
 
 @router.post("/{manuscript_id}/draft", response_model=ManuscriptRead)
 def mark_manuscript_draft(
-    manuscript_id: str,
+    manuscript_id: UUID,
     author_id: CurrentAuthorId,
     service: Annotated[ManuscriptService, Depends(get_manuscript_service)],
 ) -> ManuscriptRead:
     """Mark manuscript as undergoing editing, and unavailable."""
-    try:
-        mid = UUID(manuscript_id)
-    except ValueError:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Manuscript not found")
-
-    if not service.check_ownership(mid, author_id):
+    if not service.check_ownership(manuscript_id, author_id):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Manuscript not found")
 
     try:
-        manuscript = service.mark_draft(mid)
+        manuscript = service.mark_draft(manuscript_id)
     except ManuscriptNotFound:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Manuscript not found")
     except InvalidStateTransition as e:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
 
     return ManuscriptRead.model_validate(manuscript)
 
 
 @router.post("/{manuscript_id}/archive", response_model=ManuscriptRead)
 def archive_manuscript(
-    manuscript_id: str,
+    manuscript_id: UUID,
     author_id: CurrentAuthorId,
     service: Annotated[ManuscriptService, Depends(get_manuscript_service)],
-    db: Annotated[Session, Depends(get_db)],
 ) -> ManuscriptRead:
     """Archive a manuscript to hide it from normal listings."""
-    from uuid import UUID
-
-    try:
-        mid = UUID(manuscript_id)
-    except ValueError:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Manuscript not found")
-
-    if not service.check_ownership(mid, author_id):
+    if not service.check_ownership(manuscript_id, author_id):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Manuscript not found")
 
     try:
-        manuscript = service.archive(mid)
+        manuscript = service.archive(manuscript_id)
     except ManuscriptNotFound:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Manuscript not found")
-    except Exception as e:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    except InvalidStateTransition as e:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
 
     return ManuscriptRead.model_validate(manuscript)
 
 
 @router.post("/{manuscript_id}/unarchive", response_model=ManuscriptRead)
 def unarchive_manuscript(
-    manuscript_id: str,
+    manuscript_id: UUID,
     author_id: CurrentAuthorId,
     service: Annotated[ManuscriptService, Depends(get_manuscript_service)],
-    db: Annotated[Session, Depends(get_db)],
 ) -> ManuscriptRead:
     """Restore an archived manuscript to ready state."""
-    from uuid import UUID
-
-    try:
-        mid = UUID(manuscript_id)
-    except ValueError:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Manuscript not found")
-
-    if not service.check_ownership(mid, author_id):
+    if not service.check_ownership(manuscript_id, author_id):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Manuscript not found")
 
     try:
-        manuscript = service.unarchive(mid)
+        manuscript = service.unarchive(manuscript_id)
     except ManuscriptNotFound:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Manuscript not found")
-    except Exception as e:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    except InvalidStateTransition as e:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
 
     return ManuscriptRead.model_validate(manuscript)
 
 
 @router.delete("/{manuscript_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_manuscript(
-    manuscript_id: str,
+    manuscript_id: UUID,
     author_id: CurrentAuthorId,
     service: Annotated[ManuscriptService, Depends(get_manuscript_service)],
-    db: Annotated[Session, Depends(get_db)],
 ) -> None:
     """
     Soft delete a manuscript and all associated ebooks and samples.
 
     Files are retained in storage for potential restoration.
     """
-    from uuid import UUID
-
-    try:
-        mid = UUID(manuscript_id)
-    except ValueError:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Manuscript not found")
-
-    if not service.check_ownership(mid, author_id):
+    if not service.check_ownership(manuscript_id, author_id):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Manuscript not found")
 
     try:
-        service.soft_delete(mid)
+        service.soft_delete(manuscript_id)
     except ManuscriptNotFound:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Manuscript not found")
 
 
 @router.post("/{manuscript_id}/restore", response_model=ManuscriptRead)
 def restore_manuscript(
-    manuscript_id: str,
+    manuscript_id: UUID,
     author_id: CurrentAuthorId,
     service: Annotated[ManuscriptService, Depends(get_manuscript_service)],
-    db: Annotated[Session, Depends(get_db)],
 ) -> ManuscriptRead:
     """
     Restore a soft-deleted manuscript and all associated samples and ebooks.
     """
-    from uuid import UUID
-
-    try:
-        mid = UUID(manuscript_id)
-    except ValueError:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Manuscript not found")
-
     # Check ownership including deleted manuscripts
-    if not service.check_ownership(mid, author_id, include_deleted=True):
+    if not service.check_ownership(manuscript_id, author_id, include_deleted=True):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Manuscript not found")
 
     try:
-        service.restore(mid)
-        manuscript = service.get(mid)
+        service.restore(manuscript_id)
+        manuscript = service.get(manuscript_id)
     except ManuscriptNotFound:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Manuscript not found")
 

@@ -2,6 +2,7 @@ from uuid import UUID
 
 from app.domain import Manuscript, ManuscriptNotFound, SourceFormat
 from app.repositories.protocols import EbookRepository, ManuscriptRepository, SampleRepository, TagRepository
+from app.storage import generate_file_key, get_content_type_for_format, get_storage_backend, validate_image
 
 
 class ManuscriptService:
@@ -17,16 +18,21 @@ class ManuscriptService:
         self.ebook_repo = ebook_repo
         self.tag_repo = tag_repo
 
-    def create(
+    async def create(
         self,
         author_id: UUID,
         title: str,
         source_format: SourceFormat,
-        source_file_key: str,
+        filename: str,
+        content: bytes,
         genre_ids: list[int] | None = None,
         tag_names: list[str] | None = None,
         description: str | None = None,
     ) -> Manuscript:
+        source_file_key = generate_file_key(author_id, filename, "manuscripts")
+        content_type = get_content_type_for_format(source_format.value)
+        storage = get_storage_backend()
+        await storage.upload(source_file_key, content, content_type)
         manuscript = Manuscript(
             author_id=author_id,
             title=title,
@@ -74,15 +80,28 @@ class ManuscriptService:
 
         return self.repo.get(updated.id)
 
-    def update_source(
+    async def update_source(
         self,
         manuscript_id: UUID,
-        source_file_key: str,
+        author_id: UUID,
         source_format: SourceFormat,
+        filename: str,
+        content: bytes,
     ) -> Manuscript:
         manuscript = self.get(manuscript_id)
-        manuscript.update_source(source_file_key, source_format)
-        return self.repo.update(manuscript)
+        old_source_key = manuscript.source_file_key
+        file_key = generate_file_key(author_id, filename, "manuscripts")
+        content_type = get_content_type_for_format(source_format.value)
+        storage = get_storage_backend()
+        await storage.upload(file_key, content, content_type)
+        manuscript.update_source(file_key, source_format)
+        updated = self.repo.update(manuscript)
+        try:
+            await storage.delete(old_source_key)
+        except Exception as e:
+            print(f"This is where I'd put my WARN: {e}\nlog, if I had one")
+
+        return updated
 
     def mark_ready(self, manuscript_id: UUID) -> Manuscript:
         manuscript = self.get(manuscript_id)
@@ -139,12 +158,45 @@ class ManuscriptService:
         manuscript = self.repo.get(manuscript_id, include_deleted=include_deleted)
         return manuscript is not None and manuscript.author_id == author_id
 
-    def update_cover(self, manuscript_id: UUID, cover_image_key: str) -> Manuscript:
+    async def update_cover(
+        self,
+        manuscript_id: UUID,
+        author_id: UUID,
+        cover_image_filename: str,
+        cover_image_content: bytes,
+    ) -> Manuscript:
         manuscript = self.get(manuscript_id)
-        manuscript.set_cover(cover_image_key)
-        return self.repo.update(manuscript)
+        content_type = validate_image(cover_image_content)
+        format_extension = {"image/jpeg": "jpg", "image/png": "png"}[content_type]
+        if cover_image_filename:
+            extension = cover_image_filename.split(".")[-1]
+            if extension.lower() != format_extension:
+                cover_image_filename = cover_image_filename + f".{format_extension}"
 
-    def remove_cover(self, manuscript_id: UUID) -> Manuscript:
+        filename = cover_image_filename or f"cover.{format_extension}"
+        file_key = generate_file_key(author_id, filename, "covers")
+
+        storage = get_storage_backend()
+        await storage.upload(file_key, cover_image_content, content_type)
+        existing_cover = manuscript.cover_image_key
+        manuscript.set_cover(file_key)
+        updated = self.repo.update(manuscript)
+        if existing_cover:
+            try:
+                await storage.delete(existing_cover)
+            except Exception as e:
+                print(f"This is where I'd put my WARN: {e}\nlog, if I had one")
+
+        return updated
+
+    async def remove_cover(self, manuscript_id: UUID) -> Manuscript:
         manuscript = self.get(manuscript_id)
+        existing_cover = manuscript.cover_image_key
+        storage = get_storage_backend()
+        if existing_cover:
+            try:
+                await storage.delete(existing_cover)
+            except Exception as e:
+                print(f"This is where I'd put my WARN: {e}\nlog, if I had one")
         manuscript.remove_cover()
         return self.repo.update(manuscript)

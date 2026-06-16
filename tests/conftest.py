@@ -93,12 +93,14 @@ def client(db_session: Session, test_storage: LocalStorageBackend) -> Generator[
     import app.api.manuscripts as manuscripts_module
     import app.api.ebooks as ebooks_module
     import app.services.generation_service as generation_service_module
+    import app.services.manuscript_service as manuscript_service_module
 
     original_storage_func = storage_module.get_storage_backend
     storage_module.get_storage_backend = override_get_storage
     manuscripts_module.get_storage_backend = override_get_storage
     ebooks_module.get_storage_backend = override_get_storage
     generation_service_module.get_storage_backend = override_get_storage
+    manuscript_service_module.get_storage_backend = override_get_storage
 
     # Create tables for this test
     Base.metadata.create_all(bind=test_engine)
@@ -113,5 +115,6 @@ def client(db_session: Session, test_storage: LocalStorageBackend) -> Generator[
         manuscripts_module.get_storage_backend = original_storage_func
         ebooks_module.get_storage_backend = original_storage_func
         generation_service_module.get_storage_backend = original_storage_func
+        manuscript_service_module.get_storage_backend = original_storage_func
         # Drop all tables
         Base.metadata.drop_all(bind=test_engine)

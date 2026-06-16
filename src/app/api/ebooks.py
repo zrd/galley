@@ -9,7 +9,7 @@ from urllib.parse import quote
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
-from fastapi.responses import Response
+from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
 from app.db import get_db
@@ -23,7 +23,7 @@ from app.repositories import (
 )
 from app.schemas import EbookGenerateRequest, EbookListItem, EbookRead
 from app.schemas.ebook import EbookUpdate
-from app.security.auth import CurrentAuthorId, OptionalAuthorId
+from app.security.auth import CurrentAuthorId
 from app.services import AuthorService, EbookService, GenerationError, GenerationService, ManuscriptService
 from app.storage import get_content_type_for_format, get_storage_backend
 
@@ -74,19 +74,14 @@ def list_ebooks(
 
 @router.get("/{ebook_id}", response_model=EbookRead)
 def get_ebook(
-    ebook_id: str,
+    ebook_id: UUID,
     author_id: CurrentAuthorId,
     manuscript_service: Annotated[ManuscriptService, Depends(get_manuscript_service)],
     ebook_service: Annotated[EbookService, Depends(get_ebook_service)],
 ) -> EbookRead:
     """Get ebook metadata."""
     try:
-        eid = UUID(ebook_id)
-    except ValueError:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ebook not found")
-
-    try:
-        ebook = ebook_service.get(eid)
+        ebook = ebook_service.get(ebook_id)
     except EbookNotFound:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ebook not found")
 
@@ -99,13 +94,12 @@ def get_ebook(
 
 @router.get("/{ebook_id}/download")
 async def download_ebook(
-    ebook_id: str,
+    ebook_id: UUID,
     request: Request,
     ebook_service: Annotated[EbookService, Depends(get_ebook_service)],
     download_repo: Annotated[SQLAlchemyDownloadRepository, Depends(get_download_repo)],
-    db: Annotated[Session, Depends(get_db)],
     tracking_code: Annotated[str | None, Query(alias="t")] = None,
-) -> Response:
+) -> FileResponse:
     """
     Download an ebook file.
 
@@ -116,12 +110,7 @@ async def download_ebook(
     - t: Optional tracking code for QR/link attribution
     """
     try:
-        eid = UUID(ebook_id)
-    except ValueError:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ebook not found")
-
-    try:
-        ebook = ebook_service.get_public_download(eid)
+        ebook = ebook_service.get_public_download(ebook_id)
     except EbookNotFound:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ebook not found")
     except ManuscriptNotFound:
@@ -129,16 +118,13 @@ async def download_ebook(
     except ManuscriptInDraft:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Temporarily unavailable")
 
-    # Download file from storage
     storage = get_storage_backend()
     try:
-        file_data = await storage.download(ebook.file_key)
+        asset_path = await storage.get_url(ebook.file_key)
     except FileNotFoundError:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Ebook file not found"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ebook file not found")
 
-    # Record download
+    media_type = get_content_type_for_format(ebook.output_format.value)
     client_ip = request.client.host if request.client else None
     ip_hash = None
     if client_ip:
@@ -151,103 +137,79 @@ async def download_ebook(
         tracking_code=tracking_code,
     )
     download_repo.add(download)
-
-    # Increment download count
     ebook_service.increment_download(ebook.id)
-    # Return file
-    content_type = get_content_type_for_format(ebook.output_format.value)
-
-    return Response(
-        content=file_data,
-        media_type=content_type,
+    return FileResponse(
+        asset_path,
+        media_type=media_type,
         headers={
             "Content-Disposition": (
                 f'attachment; filename="{_ascii_filename(ebook.download_filename)}"; '
                 f"filename*=UTF-8''{quote(ebook.download_filename)}"
-            ),
-            "Content-Length": str(len(file_data)),
-        },
+            )
+        }
     )
 
 
 @router.delete("/{ebook_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_ebook(
-    ebook_id: str,
+    ebook_id: UUID,
     author_id: CurrentAuthorId,
     manuscript_service: Annotated[ManuscriptService, Depends(get_manuscript_service)],
     ebook_service: Annotated[EbookService, Depends(get_ebook_service)],
-    db: Annotated[Session, Depends(get_db)],
 ) -> None:
     """Soft delete an ebook. Files are retained for potential restoration."""
     try:
-        eid = UUID(ebook_id)
-    except ValueError:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ebook not found")
-
-    try:
-        ebook = ebook_service.get(eid)
+        ebook = ebook_service.get(ebook_id)
     except EbookNotFound:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ebook not found")
 
     if not manuscript_service.check_ownership(ebook.manuscript_id, author_id):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ebook not found")
 
-    ebook_service.soft_delete(eid)
+    ebook_service.soft_delete(ebook_id)
 
 
 @router.post("/{ebook_id}/restore", response_model=EbookRead)
 def restore_ebook(
-    ebook_id: str,
+    ebook_id: UUID,
     author_id: CurrentAuthorId,
     manuscript_service: Annotated[ManuscriptService, Depends(get_manuscript_service)],
     ebook_service: Annotated[EbookService, Depends(get_ebook_service)],
-    db: Annotated[Session, Depends(get_db)],
 ) -> EbookRead:
     """Restore a soft-deleted ebook."""
     try:
-        eid = UUID(ebook_id)
-    except ValueError:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ebook not found")
-
-    try:
-        ebook = ebook_service.get(eid, include_deleted=True)
+        ebook = ebook_service.get(ebook_id, include_deleted=True)
     except EbookNotFound:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ebook not found")
 
     if not manuscript_service.check_ownership(ebook.manuscript_id, author_id, include_deleted=True):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ebook not found")
 
-    ebook_service.restore(eid)
-    ebook = ebook_service.get(eid)
+    ebook_service.restore(ebook_id)
+    ebook = ebook_service.get(ebook_id)
     return EbookRead.model_validate(ebook)
 
 
 # Ebook generation endpoint (on manuscript)
 @router.post("/manuscripts/{manuscript_id}/generate", response_model=list[EbookRead])
 async def generate_ebooks(
-    manuscript_id: str,
+    manuscript_id: UUID,
     generate_in: EbookGenerateRequest,
     author_id: CurrentAuthorId,
     manuscript_service: Annotated[ManuscriptService, Depends(get_manuscript_service)],
     generation_service: Annotated[GenerationService, Depends(get_generation_service)],
     author_service: Annotated[AuthorService, Depends(get_author_service)],
-    db: Annotated[Session, Depends(get_db)],
 ) -> list[EbookRead]:
     """
     Generate ebooks from a manuscript in the requested formats.
 
     The manuscript must be in READY state.
     """
-    try:
-        mid = UUID(manuscript_id)
-    except ValueError:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Manuscript not found")
-
-    if not manuscript_service.check_ownership(mid, author_id):
+    if not manuscript_service.check_ownership(manuscript_id, author_id):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Manuscript not found")
 
     try:
-        manuscript = manuscript_service.get(mid)
+        manuscript = manuscript_service.get(manuscript_id)
     except ManuscriptNotFound:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Manuscript not found")
 
@@ -280,19 +242,14 @@ async def generate_ebooks(
 
 @router.patch("/{ebook_id}", response_model=EbookRead)
 def update_ebook_price(
-    ebook_id: str,
+    ebook_id: UUID,
     update_in: EbookUpdate,
     author_id: CurrentAuthorId,
     manuscript_service: Annotated[ManuscriptService, Depends(get_manuscript_service)],
     ebook_service: Annotated[EbookService, Depends(get_ebook_service)],
 ) -> EbookRead:
     try:
-        eid = UUID(ebook_id)
-    except ValueError:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ebook not found")
-
-    try:
-        ebook = ebook_service.get(eid, include_deleted=False)
+        ebook = ebook_service.get(ebook_id, include_deleted=False)
     except EbookNotFound:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ebook not found")
 
@@ -300,23 +257,18 @@ def update_ebook_price(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ebook not found")
 
     ebook_service.update_price(ebook=ebook, update_in=update_in)
-    ebook = ebook_service.get(eid)
+    ebook = ebook_service.get(ebook_id)
     return EbookRead.model_validate(ebook)
 
 
 def get_owned_ebook(
-    ebook_id: str,
+    ebook_id: UUID,
     author_id: CurrentAuthorId,
     ebook_service: Annotated[EbookService, Depends(get_ebook_service)],
     manuscript_service: Annotated[ManuscriptService, Depends(get_manuscript_service)],
 ) -> Ebook:
     try:
-        eid = UUID(ebook_id)
-    except ValueError:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ebook not found")
-
-    try:
-        ebook = ebook_service.get(eid, include_deleted=False)
+        ebook = ebook_service.get(ebook_id, include_deleted=False)
     except EbookNotFound:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ebook not found")
 
