@@ -27,7 +27,18 @@ export interface Author {
   id: string;
   email: string;
   display_name: string;
+  bio: string | null;
+  website: string | null;
+  avatar_key: string | null;
+  is_public: boolean;
   created_at: string;
+}
+
+export interface AuthorUpdateRequest {
+  display_name?: string | null;
+  bio?: string | null;
+  website?: string | null;
+  is_public?: boolean;
 }
 
 // Manuscript types

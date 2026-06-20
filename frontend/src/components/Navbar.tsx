@@ -51,6 +51,12 @@ export function Navbar() {
                   >
                     Upload
                   </Link>
+                  <Link
+                    to="/profile"
+                    className="text-gray-600 hover:text-gray-900"
+                  >
+                    Profile
+                  </Link>
                 </>
               )}
             </div>

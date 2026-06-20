@@ -9,6 +9,7 @@ import { ManuscriptDetail } from './pages/ManuscriptDetail';
 import { Ebooks } from './pages/Ebooks';
 import { Genres } from './pages/Genres';
 import { Tags } from './pages/Tags';
+import { Profile } from './pages/Profile';
 
 function App() {
   return (
@@ -59,6 +60,15 @@ function App() {
           element={
             <ProtectedRoute>
               <Tags />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/profile"
+          element={
+            <ProtectedRoute>
+              <Profile />
             </ProtectedRoute>
           }
         />

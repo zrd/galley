@@ -1,5 +1,5 @@
 import { apiClient } from './client';
-import type { LoginRequest, RegisterRequest, TokenResponse, Author } from '../types';
+import type { LoginRequest, RegisterRequest, TokenResponse, Author, AuthorUpdateRequest } from '../types';
 
 export const authApi = {
   async login(data: LoginRequest): Promise<TokenResponse> {
@@ -16,5 +16,9 @@ export const authApi = {
 
   async getMe(): Promise<Author> {
     return apiClient.get<Author>('/authors/me');
+  },
+
+  async updateProfile(data: AuthorUpdateRequest): Promise<Author> {
+    return apiClient.put<Author>('/authors/me', data);
   },
 };
