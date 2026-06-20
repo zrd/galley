@@ -8,7 +8,7 @@ from uuid import uuid4
 import pytest
 from sqlalchemy.orm import Session
 
-from app.domain import Manuscript, ManuscriptNotFound, ManuscriptState, OutputFormat, SampleNotFound, SourceFormat, TagNotFound
+from app.domain import AuthorNotFound, Manuscript, ManuscriptNotFound, ManuscriptState, OutputFormat, SampleNotFound, SourceFormat, TagNotFound
 from app.repositories import (
     SQLAlchemyAuthorRepository,
     SQLAlchemyEbookRepository,
@@ -16,6 +16,7 @@ from app.repositories import (
     SQLAlchemySampleRepository,
     SQLAlchemyTagRepository,
 )
+from app.schemas import AuthorUpdate
 from app.schemas.ebook import EbookUpdate
 from app.services import AuthorService, EbookService, ManuscriptService, SampleService, TagService
 
@@ -90,11 +91,60 @@ class TestAuthorService:
         )
         db_session.commit()
 
-        updated = service.update(created.id, display_name="New Name")
+        updated = service.update(created, AuthorUpdate(display_name="New Name"))
         db_session.commit()
 
         assert updated.display_name == "New Name"
         assert updated.email == "update@example.com"
+
+    def test_update_author_partial_preserves_other_fields(self, service: AuthorService, db_session: Session):
+        author = service.create(
+            email="partial@example.com",
+            password_hash="hash",
+            display_name="Original Name",
+        )
+        db_session.commit()
+        service.update(author, AuthorUpdate(bio="My bio", is_public=True))
+        db_session.commit()
+
+        updated = service.update(author, AuthorUpdate(bio="Updated bio"))
+        db_session.commit()
+
+        assert updated.bio == "Updated bio"
+        assert updated.display_name == "Original Name"
+        assert updated.is_public is True
+
+    def test_update_author_clears_bio_when_null(self, service: AuthorService, db_session: Session):
+        author = service.create(
+            email="clearbio@example.com",
+            password_hash="hash",
+            display_name="Test",
+        )
+        db_session.commit()
+        service.update(author, AuthorUpdate(bio="Some bio"))
+        db_session.commit()
+
+        updated = service.update(author, AuthorUpdate(bio=None))
+        db_session.commit()
+
+        assert updated.bio is None
+
+    def test_get_author_not_found_raises(self, service: AuthorService):
+        with pytest.raises(AuthorNotFound):
+            service.get(uuid4())
+
+    def test_update_author_website_normalized(self, service: AuthorService, db_session: Session):
+        author = service.create(
+            email="website@example.com",
+            password_hash="hash",
+            display_name="Test",
+        )
+        db_session.commit()
+
+        updated = service.update(author, AuthorUpdate(website="mybooksite.com"))
+        db_session.commit()
+
+        assert updated.website == "https://mybooksite.com"
 
 
 class TestManuscriptService:

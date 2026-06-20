@@ -9,6 +9,10 @@ class Author:
     display_name: str
     password_hash: str
     id: UUID = field(default_factory=uuid4)
+    bio: str | None = None
+    website: str | None = None
+    avatar_key: str | None = None
+    is_public: bool = False
     created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     deleted_at: datetime | None = None
 
@@ -21,7 +25,3 @@ class Author:
 
     def restore(self) -> None:
         self.deleted_at = None
-
-    def update_profile(self, display_name: str | None = None) -> None:
-        if display_name is not None:
-            self.display_name = display_name

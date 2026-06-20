@@ -3,8 +3,8 @@ Tests for domain entities and business logic.
 """
 
 import pytest
-
 from datetime import datetime, timezone
+from pydantic import ValidationError
 
 from app.domain import (
     Author,
@@ -18,6 +18,7 @@ from app.domain import (
     Tag,
     Visibility,
 )
+from app.schemas import AuthorUpdate
 
 
 class TestTag:
@@ -505,3 +506,37 @@ class TestEbookVisibility:
 
         ebook.make_private()
         assert ebook.visibility == Visibility.PRIVATE
+
+
+class TestAuthorSchema:
+    def test_website_none_passthrough(self):
+        assert AuthorUpdate(website=None).website is None
+
+    def test_website_https_stored_as_is(self):
+        assert AuthorUpdate(website="https://example.com").website == "https://example.com"
+
+    def test_website_http_stored_as_is(self):
+        assert AuthorUpdate(website="http://example.com").website == "http://example.com"
+
+    def test_website_scheme_case_normalized(self):
+        assert AuthorUpdate(website="HTTPS://Example.com/Path").website == "https://Example.com/Path"
+
+    def test_website_bare_domain_gets_https(self):
+        assert AuthorUpdate(website="www.example.com").website == "https://www.example.com"
+
+    def test_website_no_www_gets_https(self):
+        assert AuthorUpdate(website="example.com").website == "https://example.com"
+
+    def test_website_whitespace_trimmed(self):
+        assert AuthorUpdate(website="  https://example.com  ").website == "https://example.com"
+
+    def test_website_whitespace_only_returns_none(self):
+        assert AuthorUpdate(website="   ").website is None
+
+    def test_website_bad_scheme_raises(self):
+        with pytest.raises(ValidationError):
+            AuthorUpdate(website="ftp://example.com")
+
+    def test_website_multiple_scheme_separators_raises(self):
+        with pytest.raises(ValidationError):
+            AuthorUpdate(website="https://redirect?to=http://other.com")

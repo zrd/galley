@@ -28,8 +28,12 @@ def _author_model_to_domain(model: AuthorModel) -> Author:
     return Author(
         id=model.id,
         email=model.email,
-        password_hash=model.password_hash,
         display_name=model.display_name,
+        bio=model.bio,
+        website=model.website,
+        avatar_key=model.avatar_key,
+        is_public=model.is_public,
+        password_hash=model.password_hash,
         created_at=model.created_at,
         deleted_at=model.deleted_at,
     )
@@ -129,8 +133,12 @@ class SQLAlchemyAuthorRepository:
         model = AuthorModel(
             id=author.id,
             email=author.email,
-            password_hash=author.password_hash,
             display_name=author.display_name,
+            bio=author.bio,
+            website=author.website,
+            avatar_key=author.avatar_key,
+            is_public=author.is_public,
+            password_hash=author.password_hash,
             created_at=author.created_at,
             deleted_at=author.deleted_at,
         )
@@ -159,6 +167,10 @@ class SQLAlchemyAuthorRepository:
         if model:
             model.email = author.email
             model.display_name = author.display_name
+            model.bio = author.bio
+            model.website = author.website
+            model.avatar_key = author.avatar_key
+            model.is_public = author.is_public
             model.password_hash = author.password_hash
             model.deleted_at = author.deleted_at
             self.session.flush()

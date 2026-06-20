@@ -1,5 +1,5 @@
 from .auth import LoginRequest, RefreshRequest, TokenResponse
-from .author import AuthorCreate, AuthorRead, AuthorUpdate
+from .author import AuthorCreate, AuthorRead, AuthorUpdate, AuthorPublicRead
 from .ebook import EbookGenerateRequest, EbookListItem, EbookRead
 from .genre import GenreCreate, GenreRead, GenreListItem, GenreTree
 from .manuscript import ManuscriptCreate, ManuscriptListItem, ManuscriptRead, ManuscriptUpdate
@@ -15,6 +15,7 @@ __all__ = [
     "AuthorCreate",
     "AuthorRead",
     "AuthorUpdate",
+    "AuthorPublicRead",
     # Ebook
     "EbookGenerateRequest",
     "EbookListItem",

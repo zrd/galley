@@ -34,7 +34,8 @@ db-migrate:
 db-revision:
 	@set -e; \
 	LAST=$$(ls alembic/versions/[0-9][0-9][0-9]_*.py 2>/dev/null | sed 's|.*/\([0-9]*\)_.*|\1|' | sort -n | tail -1); \
-	NEXT=$$(printf "%03d" $$(( $${LAST:-0} + 1 ))); \
+	LAST_INT=$$(echo "$${LAST:-0}" | sed 's/^0*//;s/^$$/0/'); \
+	NEXT=$$(printf "%03d" $$(( LAST_INT + 1 ))); \
 	NEW_FILE=$$(uv run alembic revision -m "$(m)" 2>&1 | grep "Generating" | awk '{print $$2}'); \
 	SLUG=$$(basename "$$NEW_FILE" | sed 's/^[a-f0-9]*_//'); \
 	TARGET="alembic/versions/$${NEXT}_$${SLUG}"; \
