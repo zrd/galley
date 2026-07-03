@@ -10,6 +10,10 @@ import { Ebooks } from './pages/Ebooks';
 import { Genres } from './pages/Genres';
 import { Tags } from './pages/Tags';
 import { Profile } from './pages/Profile';
+import { StoreBrowse } from './pages/StoreBrowse';
+import { StoreManuscriptDetail } from './pages/StoreManuscriptDetail';
+import { StoreEditionDetail } from './pages/StoreEditionDetail';
+import { StoreAuthorDetail } from './pages/StoreAuthorDetail';
 
 function App() {
   return (
@@ -54,6 +58,12 @@ function App() {
         />
 
         <Route path="/genres" element={<Genres />} />
+
+        {/* Store (public) */}
+        <Route path="/store" element={<StoreBrowse />} />
+        <Route path="/store/ebooks/:id" element={<StoreManuscriptDetail />} />
+        <Route path="/store/editions/:id" element={<StoreEditionDetail />} />
+        <Route path="/store/authors/:id" element={<StoreAuthorDetail />} />
 
         <Route
           path="/tags"

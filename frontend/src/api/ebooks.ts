@@ -27,6 +27,25 @@ export const ebooksApi = {
     return apiClient.post<Ebook>(`/ebooks/${id}/restore`);
   },
 
+  async updatePrice(
+    id: string,
+    update: { list_price_cents?: number | null; sale_price_cents?: number | null },
+  ): Promise<Ebook> {
+    return apiClient.patch<Ebook>(`/ebooks/${id}`, update);
+  },
+
+  async publish(id: string): Promise<Ebook> {
+    return apiClient.post<Ebook>(`/ebooks/${id}/publish`);
+  },
+
+  async unlist(id: string): Promise<Ebook> {
+    return apiClient.post<Ebook>(`/ebooks/${id}/unlist`);
+  },
+
+  async makePrivate(id: string): Promise<Ebook> {
+    return apiClient.post<Ebook>(`/ebooks/${id}/make-private`);
+  },
+
   getDownloadUrl(id: string): string {
     return `${API_BASE_URL}/ebooks/${id}/download`;
   },

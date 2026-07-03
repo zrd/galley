@@ -20,6 +20,12 @@ export function Navbar() {
             </Link>
             <div className="flex space-x-4">
               <Link
+                to="/store"
+                className="text-gray-600 hover:text-gray-900"
+              >
+                Store
+              </Link>
+              <Link
                 to="/genres"
                 className="text-gray-600 hover:text-gray-900"
               >

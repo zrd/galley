@@ -6,6 +6,7 @@ import {
   useCallback,
   type ReactNode,
 } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { authApi } from '../api/auth';
 import type { Author, LoginRequest, RegisterRequest } from '../types';
 
@@ -21,6 +22,7 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
+  const queryClient = useQueryClient();
   const [user, setUser] = useState<Author | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -65,6 +67,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.removeItem('access_token');
     localStorage.removeItem('refresh_token');
     setUser(null);
+    queryClient.clear();
   };
 
   return (

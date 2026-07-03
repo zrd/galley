@@ -160,6 +160,83 @@ export interface GenreCreateRequest {
   parent_id?: number;
 }
 
+// Store types
+export interface StoreGenreTree {
+  id: number;
+  name: string;
+  slug: string;
+  published_count: number;
+  description: string | null;
+  children: StoreGenreTree[];
+}
+
+export interface StoreEditionSummary {
+  id: string;
+  output_format: string;
+  published_at: string | null;
+  is_free: boolean;
+  formatted_price: string;
+}
+
+export interface StoreAuthorSummary {
+  id: string;
+  display_name: string;
+  profile_url: string;
+}
+
+export interface StoreAuthorListItem {
+  id: string;
+  display_name: string;
+  bio: string | null;
+  website: string | null;
+  avatar_url: string | null;
+  profile_url: string;
+}
+
+export interface StoreBrowseItem {
+  id: string;
+  title: string;
+  author: StoreAuthorSummary;
+  description: string | null;
+  genres: StoreGenreTree[];
+  tags: TagRead[];
+  editions: StoreEditionSummary[];
+  cover_url: string | null;
+  first_published_at: string | null;
+}
+
+export type StoreManuscriptDetail = StoreBrowseItem;
+
+export interface StoreEditionDetail {
+  id: string;
+  manuscript: StoreManuscriptDetail;
+  output_format: string;
+  file_size_bytes: number;
+  sample_id: string | null;
+  price_currency: string;
+  download_url: string;
+  is_free: boolean;
+  formatted_price: string;
+  direct_download: boolean;
+}
+
+export interface StoreAuthorDetail {
+  id: string;
+  display_name: string;
+  bio: string | null;
+  website: string | null;
+  avatar_url: string | null;
+  profile_url: string;
+  listings: StoreBrowseItem[];
+}
+
+export interface StorePaginatedResponse<T> {
+  items: T[];
+  total: number;
+  page: number;
+  per_page: number;
+}
+
 // API Error
 export interface ApiError {
   detail: string | { loc: string[]; msg: string; type: string }[];

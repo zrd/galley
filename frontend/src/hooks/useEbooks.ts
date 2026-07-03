@@ -39,3 +39,54 @@ export function useRestoreEbook() {
     },
   });
 }
+
+export function useUpdateEbookPrice() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      id,
+      ...update
+    }: {
+      id: string;
+      list_price_cents?: number | null;
+      sale_price_cents?: number | null;
+    }) => ebooksApi.updatePrice(id, update),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['ebooks'] });
+      queryClient.invalidateQueries({ queryKey: ['store'] });
+    },
+  });
+}
+
+export function usePublishEbook() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => ebooksApi.publish(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['ebooks'] });
+      queryClient.invalidateQueries({ queryKey: ['store'] });
+    },
+  });
+}
+
+export function useUnlistEbook() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => ebooksApi.unlist(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['ebooks'] });
+      queryClient.invalidateQueries({ queryKey: ['store'] });
+    },
+  });
+}
+
+export function useMakePrivateEbook() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => ebooksApi.makePrivate(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['ebooks'] });
+      queryClient.invalidateQueries({ queryKey: ['store'] });
+    },
+  });
+}
