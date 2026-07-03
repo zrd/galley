@@ -15,6 +15,7 @@ from .exceptions import (
     ManuscriptInDraft,
     SampleNotFound,
     TagNotFound,
+    UnlistedDownloadLimitExceeded,
 )
 from .genre import Genre
 from .manuscript import Manuscript
@@ -48,4 +49,5 @@ __all__ = [
     "ManuscriptInDraft",
     "SampleNotFound",
     "TagNotFound",
+    "UnlistedDownloadLimitExceeded",
 ]

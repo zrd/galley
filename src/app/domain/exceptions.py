@@ -64,3 +64,8 @@ class AuthorizationError(DomainError):
     """Raised when user lacks permission for an action."""
 
     pass
+
+class UnlistedDownloadLimitExceeded(DomainError):
+    """Raised when an unlisted edition has reached its download limit."""
+
+    pass

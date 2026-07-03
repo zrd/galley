@@ -34,3 +34,14 @@ class GenreTree(BaseModel):
     slug: str
     description: str | None
     children: list["GenreTree"] = []
+
+
+class StoreGenreTree(BaseModel):
+    model_config = {"from_attributes": True}
+
+    id: int
+    name: str
+    slug: str
+    published_count: int = 0
+    description: str | None
+    children: list["StoreGenreTree"] = []

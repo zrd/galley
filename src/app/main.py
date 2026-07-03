@@ -11,6 +11,7 @@ from app.api import (
     health_router,
     manuscripts_router,
     samples_router,
+    store_router,
 )
 from app.api.errors import register_error_handlers
 from app.config import settings
@@ -56,6 +57,8 @@ app.include_router(samples_router, prefix="/samples", tags=["samples"])
 
 # Ebook management and downloads
 app.include_router(ebooks_router, prefix="/ebooks", tags=["ebooks"])
+
+app.include_router(store_router, prefix="/store", tags=["store"])
 
 # Debug endpoints (dev only)
 if settings.ENVIRONMENT == "dev":

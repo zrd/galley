@@ -5,6 +5,7 @@ from .generation_service import GenerationError, GenerationService
 from .genre_service import GenreService
 from .manuscript_service import ManuscriptService
 from .sample_service import SampleService
+from .store_service import StoreService
 from .tag_service import TagService
 
 __all__ = [
@@ -18,5 +19,6 @@ __all__ = [
     "ManuscriptService",
     "SampleService",
     "TagService",
+    "StoreService",
     "get_conversion_service",
 ]

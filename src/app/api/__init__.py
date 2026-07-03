@@ -6,6 +6,7 @@ from .genres import router as genres_router
 from .health import router as health_router
 from .manuscripts import router as manuscripts_router
 from .samples import router as samples_router
+from .store import router as store_router
 from .tags import router as tags_router
 
 __all__ = [
@@ -17,5 +18,6 @@ __all__ = [
     "health_router",
     "manuscripts_router",
     "samples_router",
+    "store_router",
     "tags_router",
 ]

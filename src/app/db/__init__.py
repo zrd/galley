@@ -1,5 +1,5 @@
 from .base import Base, SessionLocal, engine, get_db
-from .models import AuthorModel, DownloadModel, EbookModel, ManuscriptModel, SampleModel, TagModel
+from .models import AuthorModel, DownloadModel, EbookModel, GenreModel, ManuscriptModel, SampleModel, TagModel
 
 __all__ = [
     "Base",
@@ -9,6 +9,7 @@ __all__ = [
     "AuthorModel",
     "DownloadModel",
     "EbookModel",
+    "GenreModel",
     "ManuscriptModel",
     "SampleModel",
     "TagModel",

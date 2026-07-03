@@ -15,6 +15,7 @@ from .sqlalchemy import (
     SQLAlchemyManuscriptRepository,
     SQLAlchemySampleRepository,
     SQLAlchemyTagRepository,
+    SQLAlchemyStoreRepository,
 )
 
 __all__ = [
@@ -34,4 +35,5 @@ __all__ = [
     "SQLAlchemyManuscriptRepository",
     "SQLAlchemySampleRepository",
     "SQLAlchemyTagRepository",
+    "SQLAlchemyStoreRepository",
 ]
