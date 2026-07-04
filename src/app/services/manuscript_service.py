@@ -1,7 +1,7 @@
 from uuid import UUID
 
 from app.domain import Manuscript, ManuscriptNotFound, SourceFormat
-from app.repositories.protocols import EbookRepository, ManuscriptRepository, SampleRepository, TagRepository
+from app.repositories import EbookRepository, ManuscriptRepository, SampleRepository, TagRepository
 from app.storage import generate_file_key, get_content_type_for_format, get_storage_backend, validate_image
 
 

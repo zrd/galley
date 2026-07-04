@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 
 from app.db import get_db
 from app.domain import GenreNotFound
-from app.repositories import SQLAlchemyGenreRepository
+from app.repositories import GenreRepository
 from app.schemas import GenreListItem, GenreRead, GenreTree
 from app.services import GenreService
 
@@ -18,7 +18,7 @@ router = APIRouter()
 
 def get_genre_service(db: Annotated[Session, Depends(get_db)]) -> GenreService:
     """Dependency to get a GenreService with database session."""
-    genre_repo = SQLAlchemyGenreRepository(db)
+    genre_repo = GenreRepository(db)
     return GenreService(genre_repo)
 
 

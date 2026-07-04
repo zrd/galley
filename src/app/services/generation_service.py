@@ -10,7 +10,7 @@ import re
 from uuid import UUID
 
 from app.domain import Ebook, Manuscript, OutputFormat, Sample
-from app.repositories.protocols import EbookRepository
+from app.repositories import EbookRepository
 from app.storage import generate_file_key, get_content_type_for_format, get_storage_backend
 
 from .conversion_service import ConversionService, get_conversion_service

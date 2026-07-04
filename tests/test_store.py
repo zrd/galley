@@ -21,7 +21,7 @@ from app.db.models import (
     TagModel,
 )
 from app.domain.enums import ManuscriptState, OutputFormat, SourceFormat, Visibility
-from app.repositories import SQLAlchemyStoreRepository
+from app.repositories import StoreRepository
 from app.services import StoreService
 
 
@@ -104,13 +104,13 @@ EARLIER = NOW - timedelta(days=10)
 
 
 @pytest.fixture
-def repo(db_session: Session) -> SQLAlchemyStoreRepository:
-    return SQLAlchemyStoreRepository(db_session)
+def repo(db_session: Session) -> StoreRepository:
+    return StoreRepository(db_session)
 
 
 @pytest.fixture
 def service(db_session: Session) -> StoreService:
-    return StoreService(SQLAlchemyStoreRepository(db_session))
+    return StoreService(StoreRepository(db_session))
 
 
 @pytest.fixture
@@ -130,35 +130,35 @@ def two_books(db_session: Session) -> tuple:
 # ---------------------------------------------------------------------------
 
 class TestBrowseListingsSorting:
-    def test_newest(self, repo: SQLAlchemyStoreRepository, two_books):
+    def test_newest(self, repo: StoreRepository, two_books):
         results, _ = repo.browse_listings(offset=0, limit=10, sorting_method="newest")
         assert [r.title for r in results] == ["Zebra", "Aardvark"]
 
-    def test_oldest(self, repo: SQLAlchemyStoreRepository, two_books):
+    def test_oldest(self, repo: StoreRepository, two_books):
         results, _ = repo.browse_listings(offset=0, limit=10, sorting_method="oldest")
         assert [r.title for r in results] == ["Aardvark", "Zebra"]
 
-    def test_a_to_z(self, repo: SQLAlchemyStoreRepository, two_books):
+    def test_a_to_z(self, repo: StoreRepository, two_books):
         results, _ = repo.browse_listings(offset=0, limit=10, sorting_method="a_to_z")
         assert [r.title for r in results] == ["Aardvark", "Zebra"]
 
-    def test_z_to_a(self, repo: SQLAlchemyStoreRepository, two_books):
+    def test_z_to_a(self, repo: StoreRepository, two_books):
         results, _ = repo.browse_listings(offset=0, limit=10, sorting_method="z_to_a")
         assert [r.title for r in results] == ["Zebra", "Aardvark"]
 
-    def test_least_expensive(self, repo: SQLAlchemyStoreRepository, two_books):
+    def test_least_expensive(self, repo: StoreRepository, two_books):
         results, _ = repo.browse_listings(offset=0, limit=10, sorting_method="least_expensive")
         assert [r.title for r in results] == ["Zebra", "Aardvark"]
 
-    def test_most_expensive(self, repo: SQLAlchemyStoreRepository, two_books):
+    def test_most_expensive(self, repo: StoreRepository, two_books):
         results, _ = repo.browse_listings(offset=0, limit=10, sorting_method="most_expensive")
         assert [r.title for r in results] == ["Aardvark", "Zebra"]
 
-    def test_unknown_sort_falls_back_to_newest(self, repo: SQLAlchemyStoreRepository, two_books):
+    def test_unknown_sort_falls_back_to_newest(self, repo: StoreRepository, two_books):
         results, _ = repo.browse_listings(offset=0, limit=10, sorting_method="bogus")
         assert [r.title for r in results] == ["Zebra", "Aardvark"]
 
-    def test_sale_price_used_over_list_price(self, repo: SQLAlchemyStoreRepository, db_session: Session):
+    def test_sale_price_used_over_list_price(self, repo: StoreRepository, db_session: Session):
         """Effective price uses sale_price_cents when set."""
         author = _author(db_session)
         m1 = _manuscript(db_session, author.id, "Expensive")
@@ -240,7 +240,7 @@ class TestGenreTreeAssembly:
 # ---------------------------------------------------------------------------
 
 class TestBrowseListingsFilters:
-    def test_filter_by_genre_slug(self, repo: SQLAlchemyStoreRepository, db_session: Session):
+    def test_filter_by_genre_slug(self, repo: StoreRepository, db_session: Session):
         author = _author(db_session)
         genre = _genre(db_session, "Fiction")
         m1 = _manuscript(db_session, author.id, "Tagged")
@@ -254,7 +254,7 @@ class TestBrowseListingsFilters:
         assert total == 1
         assert results[0].title == "Tagged"
 
-    def test_filter_by_tag_slug(self, repo: SQLAlchemyStoreRepository, db_session: Session):
+    def test_filter_by_tag_slug(self, repo: StoreRepository, db_session: Session):
         author = _author(db_session)
         tag = _tag(db_session, author.id, "Fantasy")
         m1 = _manuscript(db_session, author.id, "Tagged")
@@ -268,7 +268,7 @@ class TestBrowseListingsFilters:
         assert total == 1
         assert results[0].title == "Tagged"
 
-    def test_filter_by_author_id(self, repo: SQLAlchemyStoreRepository, db_session: Session):
+    def test_filter_by_author_id(self, repo: StoreRepository, db_session: Session):
         a1 = _author(db_session, "Alice")
         a2 = _author(db_session, "Bob")
         m1 = _manuscript(db_session, a1.id, "Alice Book")
@@ -281,7 +281,7 @@ class TestBrowseListingsFilters:
         assert total == 1
         assert results[0].title == "Alice Book"
 
-    def test_filter_by_min_price(self, repo: SQLAlchemyStoreRepository, db_session: Session):
+    def test_filter_by_min_price(self, repo: StoreRepository, db_session: Session):
         author = _author(db_session)
         m_cheap = _manuscript(db_session, author.id, "Cheap")
         _ebook(db_session, m_cheap.id, list_price_cents=100)
@@ -293,7 +293,7 @@ class TestBrowseListingsFilters:
         assert total == 1
         assert results[0].title == "Pricey"
 
-    def test_filter_by_max_price(self, repo: SQLAlchemyStoreRepository, db_session: Session):
+    def test_filter_by_max_price(self, repo: StoreRepository, db_session: Session):
         author = _author(db_session)
         m_cheap = _manuscript(db_session, author.id, "Cheap")
         _ebook(db_session, m_cheap.id, list_price_cents=100)
@@ -305,7 +305,7 @@ class TestBrowseListingsFilters:
         assert total == 1
         assert results[0].title == "Cheap"
 
-    def test_price_filter_uses_sale_over_list(self, repo: SQLAlchemyStoreRepository, db_session: Session):
+    def test_price_filter_uses_sale_over_list(self, repo: StoreRepository, db_session: Session):
         """min_price filter uses effective price (sale_price beats list_price)."""
         author = _author(db_session)
         m = _manuscript(db_session, author.id, "On Sale")
@@ -316,7 +316,7 @@ class TestBrowseListingsFilters:
         results, _ = repo.browse_listings(offset=0, limit=10, min_price=1000)
         assert len(results) == 0
 
-    def test_search_by_title(self, repo: SQLAlchemyStoreRepository, db_session: Session):
+    def test_search_by_title(self, repo: StoreRepository, db_session: Session):
         author = _author(db_session)
         m1 = _manuscript(db_session, author.id, "Space Opera")
         _ebook(db_session, m1.id)
@@ -328,7 +328,7 @@ class TestBrowseListingsFilters:
         assert total == 1
         assert results[0].title == "Space Opera"
 
-    def test_search_by_author_name(self, repo: SQLAlchemyStoreRepository, db_session: Session):
+    def test_search_by_author_name(self, repo: StoreRepository, db_session: Session):
         a1 = _author(db_session, "Alice Wordsworth")
         a2 = _author(db_session, "Bob Jones")
         m1 = _manuscript(db_session, a1.id, "Book One")
@@ -341,7 +341,7 @@ class TestBrowseListingsFilters:
         assert total == 1
         assert results[0].title == "Book One"
 
-    def test_excludes_soft_deleted_manuscripts(self, repo: SQLAlchemyStoreRepository, db_session: Session):
+    def test_excludes_soft_deleted_manuscripts(self, repo: StoreRepository, db_session: Session):
         author = _author(db_session)
         m = _manuscript(db_session, author.id)
         _ebook(db_session, m.id)
@@ -351,7 +351,7 @@ class TestBrowseListingsFilters:
         _, total = repo.browse_listings(offset=0, limit=10)
         assert total == 0
 
-    def test_excludes_manuscripts_with_no_published_ebook(self, repo: SQLAlchemyStoreRepository, db_session: Session):
+    def test_excludes_manuscripts_with_no_published_ebook(self, repo: StoreRepository, db_session: Session):
         author = _author(db_session)
         m = _manuscript(db_session, author.id)
         _ebook(db_session, m.id, visibility=Visibility.PRIVATE)
@@ -360,7 +360,7 @@ class TestBrowseListingsFilters:
         _, total = repo.browse_listings(offset=0, limit=10)
         assert total == 0
 
-    def test_pagination_returns_correct_slice(self, repo: SQLAlchemyStoreRepository, db_session: Session):
+    def test_pagination_returns_correct_slice(self, repo: StoreRepository, db_session: Session):
         author = _author(db_session)
         for i in range(5):
             m = _manuscript(db_session, author.id, f"Book {i}")
@@ -375,7 +375,7 @@ class TestBrowseListingsFilters:
         assert total2 == 5
         assert len(results2) == 2
 
-    def test_total_count_independent_of_limit(self, repo: SQLAlchemyStoreRepository, db_session: Session):
+    def test_total_count_independent_of_limit(self, repo: StoreRepository, db_session: Session):
         author = _author(db_session)
         for i in range(4):
             m = _manuscript(db_session, author.id, f"Book {i}")
@@ -391,7 +391,7 @@ class TestBrowseListingsFilters:
 # ---------------------------------------------------------------------------
 
 class TestGetListing:
-    def test_returns_manuscript_with_published_ebook(self, repo: SQLAlchemyStoreRepository, db_session: Session):
+    def test_returns_manuscript_with_published_ebook(self, repo: StoreRepository, db_session: Session):
         author = _author(db_session)
         m = _manuscript(db_session, author.id, "Published")
         _ebook(db_session, m.id)
@@ -401,7 +401,7 @@ class TestGetListing:
         assert result is not None
         assert result.id == m.id
 
-    def test_returns_none_when_no_published_ebook(self, repo: SQLAlchemyStoreRepository, db_session: Session):
+    def test_returns_none_when_no_published_ebook(self, repo: StoreRepository, db_session: Session):
         author = _author(db_session)
         m = _manuscript(db_session, author.id)
         _ebook(db_session, m.id, visibility=Visibility.PRIVATE)
@@ -409,7 +409,7 @@ class TestGetListing:
 
         assert repo.get_listing(m.id) is None
 
-    def test_returns_none_for_unlisted_only(self, repo: SQLAlchemyStoreRepository, db_session: Session):
+    def test_returns_none_for_unlisted_only(self, repo: StoreRepository, db_session: Session):
         """Unlisted alone does not qualify a manuscript as a store listing."""
         author = _author(db_session)
         m = _manuscript(db_session, author.id)
@@ -418,7 +418,7 @@ class TestGetListing:
 
         assert repo.get_listing(m.id) is None
 
-    def test_returns_none_for_soft_deleted(self, repo: SQLAlchemyStoreRepository, db_session: Session):
+    def test_returns_none_for_soft_deleted(self, repo: StoreRepository, db_session: Session):
         author = _author(db_session)
         m = _manuscript(db_session, author.id)
         _ebook(db_session, m.id)
@@ -427,7 +427,7 @@ class TestGetListing:
 
         assert repo.get_listing(m.id) is None
 
-    def test_editions_excludes_private_siblings(self, repo: SQLAlchemyStoreRepository, db_session: Session):
+    def test_editions_excludes_private_siblings(self, repo: StoreRepository, db_session: Session):
         """Private ebook on a published manuscript must not appear in the editions list."""
         author = _author(db_session)
         m = _manuscript(db_session, author.id)
@@ -446,7 +446,7 @@ class TestGetListing:
 # ---------------------------------------------------------------------------
 
 class TestGetEdition:
-    def test_returns_published_edition(self, repo: SQLAlchemyStoreRepository, db_session: Session):
+    def test_returns_published_edition(self, repo: StoreRepository, db_session: Session):
         author = _author(db_session)
         m = _manuscript(db_session, author.id)
         e = _ebook(db_session, m.id, visibility=Visibility.PUBLISHED)
@@ -456,7 +456,7 @@ class TestGetEdition:
         assert result is not None
         assert result.id == e.id
 
-    def test_returns_unlisted_edition(self, repo: SQLAlchemyStoreRepository, db_session: Session):
+    def test_returns_unlisted_edition(self, repo: StoreRepository, db_session: Session):
         author = _author(db_session)
         m = _manuscript(db_session, author.id)
         e = _ebook(db_session, m.id, visibility=Visibility.UNLISTED)
@@ -464,7 +464,7 @@ class TestGetEdition:
 
         assert repo.get_edition(e.id) is not None
 
-    def test_returns_none_for_private_edition(self, repo: SQLAlchemyStoreRepository, db_session: Session):
+    def test_returns_none_for_private_edition(self, repo: StoreRepository, db_session: Session):
         author = _author(db_session)
         m = _manuscript(db_session, author.id)
         e = _ebook(db_session, m.id, visibility=Visibility.PRIVATE)
@@ -472,7 +472,7 @@ class TestGetEdition:
 
         assert repo.get_edition(e.id) is None
 
-    def test_returns_none_for_deleted_edition(self, repo: SQLAlchemyStoreRepository, db_session: Session):
+    def test_returns_none_for_deleted_edition(self, repo: StoreRepository, db_session: Session):
         author = _author(db_session)
         m = _manuscript(db_session, author.id)
         e = _ebook(db_session, m.id, visibility=Visibility.PUBLISHED)
@@ -481,7 +481,7 @@ class TestGetEdition:
 
         assert repo.get_edition(e.id) is None
 
-    def test_manuscript_ebooks_excludes_private_siblings(self, repo: SQLAlchemyStoreRepository, db_session: Session):
+    def test_manuscript_ebooks_excludes_private_siblings(self, repo: StoreRepository, db_session: Session):
         """manuscript.ebooks on the returned edition should only be PUBLISHED."""
         author = _author(db_session)
         m = _manuscript(db_session, author.id)
@@ -499,7 +499,7 @@ class TestGetEdition:
 # ---------------------------------------------------------------------------
 
 class TestGetAuthorProfile:
-    def test_returns_public_author(self, repo: SQLAlchemyStoreRepository, db_session: Session):
+    def test_returns_public_author(self, repo: StoreRepository, db_session: Session):
         author = _author(db_session, is_public=True)
         db_session.commit()
 
@@ -507,20 +507,20 @@ class TestGetAuthorProfile:
         assert result is not None
         assert result.id == author.id
 
-    def test_returns_none_for_private_author(self, repo: SQLAlchemyStoreRepository, db_session: Session):
+    def test_returns_none_for_private_author(self, repo: StoreRepository, db_session: Session):
         author = _author(db_session, is_public=False)
         db_session.commit()
 
         assert repo.get_author_profile(author.id) is None
 
-    def test_returns_none_for_deleted_author(self, repo: SQLAlchemyStoreRepository, db_session: Session):
+    def test_returns_none_for_deleted_author(self, repo: StoreRepository, db_session: Session):
         author = _author(db_session, is_public=True)
         author.deleted_at = datetime.now(timezone.utc)
         db_session.commit()
 
         assert repo.get_author_profile(author.id) is None
 
-    def test_manuscript_ebooks_excludes_non_published(self, repo: SQLAlchemyStoreRepository, db_session: Session):
+    def test_manuscript_ebooks_excludes_non_published(self, repo: StoreRepository, db_session: Session):
         """Only PUBLISHED ebooks should appear within each manuscript on the profile."""
         author = _author(db_session, is_public=True)
         m = _manuscript(db_session, author.id)
@@ -532,7 +532,7 @@ class TestGetAuthorProfile:
         assert len(result.manuscripts) == 1
         assert all(e.visibility == Visibility.PUBLISHED for e in result.manuscripts[0].ebooks)
 
-    def test_includes_manuscript_with_no_published_ebook(self, repo: SQLAlchemyStoreRepository, db_session: Session):
+    def test_includes_manuscript_with_no_published_ebook(self, repo: StoreRepository, db_session: Session):
         """Author profile shows all non-deleted manuscripts regardless of ebook state."""
         author = _author(db_session, is_public=True)
         m = _manuscript(db_session, author.id)
@@ -543,7 +543,7 @@ class TestGetAuthorProfile:
         assert len(result.manuscripts) == 1
         assert len(result.manuscripts[0].ebooks) == 0
 
-    def test_excludes_deleted_manuscripts(self, repo: SQLAlchemyStoreRepository, db_session: Session):
+    def test_excludes_deleted_manuscripts(self, repo: StoreRepository, db_session: Session):
         author = _author(db_session, is_public=True)
         m = _manuscript(db_session, author.id)
         m.deleted_at = datetime.now(timezone.utc)
@@ -559,7 +559,7 @@ class TestGetAuthorProfile:
 # ---------------------------------------------------------------------------
 
 class TestListAuthorProfiles:
-    def test_returns_public_authors_only(self, repo: SQLAlchemyStoreRepository, db_session: Session):
+    def test_returns_public_authors_only(self, repo: StoreRepository, db_session: Session):
         _author(db_session, "Public", is_public=True)
         _author(db_session, "Private", is_public=False)
         db_session.commit()
@@ -568,7 +568,7 @@ class TestListAuthorProfiles:
         assert total == 1
         assert results[0].display_name == "Public"
 
-    def test_excludes_deleted_authors(self, repo: SQLAlchemyStoreRepository, db_session: Session):
+    def test_excludes_deleted_authors(self, repo: StoreRepository, db_session: Session):
         a = _author(db_session, is_public=True)
         a.deleted_at = datetime.now(timezone.utc)
         db_session.commit()
@@ -576,7 +576,7 @@ class TestListAuthorProfiles:
         _, total = repo.list_author_profiles(offset=0, limit=10)
         assert total == 0
 
-    def test_pagination(self, repo: SQLAlchemyStoreRepository, db_session: Session):
+    def test_pagination(self, repo: StoreRepository, db_session: Session):
         for i in range(4):
             _author(db_session, f"Author {i}", is_public=True)
         db_session.commit()
@@ -601,7 +601,7 @@ class TestEagerLoading:
     """
 
     def test_browse_listings_loads_all_relationships(
-        self, repo: SQLAlchemyStoreRepository, db_session: Session
+        self, repo: StoreRepository, db_session: Session
     ):
         author = _author(db_session)
         genre = _genre(db_session, "Sci-Fi")
@@ -622,7 +622,7 @@ class TestEagerLoading:
         _ = [e.id for e in r.ebooks]      # selectinload (filtered to published)
 
     def test_get_listing_loads_all_relationships(
-        self, repo: SQLAlchemyStoreRepository, db_session: Session
+        self, repo: StoreRepository, db_session: Session
     ):
         author = _author(db_session)
         genre = _genre(db_session, "Nonfiction")
@@ -642,7 +642,7 @@ class TestEagerLoading:
         _ = [e.id for e in result.ebooks]
 
     def test_get_edition_loads_nested_manuscript_relationships(
-        self, repo: SQLAlchemyStoreRepository, db_session: Session
+        self, repo: StoreRepository, db_session: Session
     ):
         author = _author(db_session)
         genre = _genre(db_session, "Thriller")
@@ -663,7 +663,7 @@ class TestEagerLoading:
         _ = [e.id for e in ms.ebooks]      # selectinload(manuscript → ebooks filtered)
 
     def test_get_author_profile_loads_nested_manuscript_relationships(
-        self, repo: SQLAlchemyStoreRepository, db_session: Session
+        self, repo: StoreRepository, db_session: Session
     ):
         author = _author(db_session, is_public=True)
         genre = _genre(db_session, "Romance")

@@ -3,12 +3,12 @@ from uuid import UUID
 
 from app.db import AuthorModel, EbookModel, GenreModel, ManuscriptModel
 from app.domain import AuthorNotFound, EbookNotFound, ManuscriptNotFound, UnlistedDownloadLimitExceeded, Visibility
-from app.repositories import SQLAlchemyStoreRepository
+from app.repositories import StoreRepository
 from app.schemas.genre import StoreGenreTree
 
 
 class StoreService:
-    def __init__(self, repo: SQLAlchemyStoreRepository):
+    def __init__(self, repo: StoreRepository):
         self.repo = repo
 
     def browse_listings(

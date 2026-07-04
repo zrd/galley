@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, Form, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.db import get_db
-from app.repositories import SQLAlchemyTagRepository
+from app.repositories import TagRepository
 from app.schemas import TagRead
 from app.security.auth import CurrentAuthorId
 from app.services import TagService
@@ -18,7 +18,7 @@ router = APIRouter()
 
 def get_tag_service(db: Annotated[Session, Depends(get_db)]) -> TagService:
     """Dependency to get a TagService with database session."""
-    tag_repo = SQLAlchemyTagRepository(db)
+    tag_repo = TagRepository(db)
     return TagService(tag_repo)
 
 

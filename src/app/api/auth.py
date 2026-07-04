@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.db import get_db
-from app.repositories import SQLAlchemyAuthorRepository
+from app.repositories import AuthorRepository
 from app.schemas import AuthorCreate, AuthorRead, LoginRequest, RefreshRequest, TokenResponse
 from app.security.auth import (
     create_access_token,
@@ -25,7 +25,7 @@ router = APIRouter()
 
 def get_author_service(db: Annotated[Session, Depends(get_db)]) -> AuthorService:
     """Dependency to get an AuthorService with database session."""
-    repo = SQLAlchemyAuthorRepository(db)
+    repo = AuthorRepository(db)
     return AuthorService(repo)
 
 

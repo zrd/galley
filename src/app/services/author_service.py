@@ -1,7 +1,7 @@
 from uuid import UUID
 
 from app.domain import Author, AuthorNotFound
-from app.repositories.protocols import AuthorRepository
+from app.repositories import AuthorRepository
 from app.schemas import AuthorUpdate
 
 

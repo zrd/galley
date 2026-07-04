@@ -1,7 +1,7 @@
 from uuid import UUID
 
 from app.domain import Sample, SampleNotFound
-from app.repositories.protocols import EbookRepository, SampleRepository
+from app.repositories import EbookRepository, SampleRepository
 
 
 class SampleService:

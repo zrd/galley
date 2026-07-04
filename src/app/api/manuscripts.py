@@ -12,10 +12,10 @@ from sqlalchemy.orm import Session
 from app.db import get_db
 from app.domain import ManuscriptNotFound, SourceFormat, InvalidStateTransition
 from app.repositories import (
-    SQLAlchemyEbookRepository,
-    SQLAlchemyManuscriptRepository,
-    SQLAlchemySampleRepository,
-    SQLAlchemyTagRepository,
+    EbookRepository,
+    ManuscriptRepository,
+    SampleRepository,
+    TagRepository,
 )
 from app.schemas import ManuscriptListItem, ManuscriptRead, ManuscriptUpdate
 from app.security.auth import CurrentAuthorId
@@ -27,10 +27,10 @@ router = APIRouter()
 
 def get_manuscript_service(db: Annotated[Session, Depends(get_db)]) -> ManuscriptService:
     """Dependency to get a ManuscriptService with database session."""
-    manuscript_repo = SQLAlchemyManuscriptRepository(db)
-    sample_repo = SQLAlchemySampleRepository(db)
-    ebook_repo = SQLAlchemyEbookRepository(db)
-    tag_repo = SQLAlchemyTagRepository(db)
+    manuscript_repo = ManuscriptRepository(db)
+    sample_repo = SampleRepository(db)
+    ebook_repo = EbookRepository(db)
+    tag_repo = TagRepository(db)
     return ManuscriptService(manuscript_repo, sample_repo, ebook_repo, tag_repo)
 
 

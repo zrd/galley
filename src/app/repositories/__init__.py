@@ -1,39 +1,21 @@
-from .protocols import (
+from .sqlalchemy import (
     AuthorRepository,
     DownloadRepository,
     EbookRepository,
     GenreRepository,
     ManuscriptRepository,
     SampleRepository,
+    StoreRepository,
     TagRepository,
-)
-from .sqlalchemy import (
-    SQLAlchemyAuthorRepository,
-    SQLAlchemyDownloadRepository,
-    SQLAlchemyEbookRepository,
-    SQLAlchemyGenreRepository,
-    SQLAlchemyManuscriptRepository,
-    SQLAlchemySampleRepository,
-    SQLAlchemyTagRepository,
-    SQLAlchemyStoreRepository,
 )
 
 __all__ = [
-    # Protocols
     "AuthorRepository",
     "DownloadRepository",
     "EbookRepository",
     "GenreRepository",
     "ManuscriptRepository",
     "SampleRepository",
+    "StoreRepository",
     "TagRepository",
-    # SQLAlchemy implementations
-    "SQLAlchemyAuthorRepository",
-    "SQLAlchemyDownloadRepository",
-    "SQLAlchemyEbookRepository",
-    "SQLAlchemyGenreRepository",
-    "SQLAlchemyManuscriptRepository",
-    "SQLAlchemySampleRepository",
-    "SQLAlchemyTagRepository",
-    "SQLAlchemyStoreRepository",
 ]

@@ -10,11 +10,11 @@ from sqlalchemy.orm import Session
 
 from app.domain import AuthorNotFound, Manuscript, ManuscriptNotFound, ManuscriptState, OutputFormat, SampleNotFound, SourceFormat, TagNotFound
 from app.repositories import (
-    SQLAlchemyAuthorRepository,
-    SQLAlchemyEbookRepository,
-    SQLAlchemyManuscriptRepository,
-    SQLAlchemySampleRepository,
-    SQLAlchemyTagRepository,
+    AuthorRepository,
+    EbookRepository,
+    ManuscriptRepository,
+    SampleRepository,
+    TagRepository,
 )
 from app.schemas import AuthorUpdate
 from app.schemas.ebook import EbookUpdate
@@ -22,7 +22,7 @@ from app.services import AuthorService, EbookService, ManuscriptService, SampleS
 
 
 def _make_manuscript(
-    repo: SQLAlchemyManuscriptRepository,
+    repo: ManuscriptRepository,
     author_id,
     title: str = "Test Book",
     source_format: SourceFormat = SourceFormat.EPUB,
@@ -38,7 +38,7 @@ def _make_manuscript(
 class TestAuthorService:
     @pytest.fixture
     def service(self, db_session: Session) -> AuthorService:
-        repo = SQLAlchemyAuthorRepository(db_session)
+        repo = AuthorRepository(db_session)
         return AuthorService(repo)
 
     def test_create_author(self, service: AuthorService, db_session: Session):
@@ -150,14 +150,14 @@ class TestAuthorService:
 class TestManuscriptService:
     @pytest.fixture
     def service(self, db_session: Session) -> ManuscriptService:
-        repo = SQLAlchemyManuscriptRepository(db_session)
-        tag_repo = SQLAlchemyTagRepository(db_session)
+        repo = ManuscriptRepository(db_session)
+        tag_repo = TagRepository(db_session)
         return ManuscriptService(repo, tag_repo=tag_repo)
 
     @pytest.fixture
     def author_id(self, db_session: Session):
         """Create an author for manuscript tests."""
-        repo = SQLAlchemyAuthorRepository(db_session)
+        repo = AuthorRepository(db_session)
         author_service = AuthorService(repo)
         author = author_service.create(
             email="manuscript-test@example.com",
@@ -186,7 +186,7 @@ class TestManuscriptService:
         assert manuscript.state == ManuscriptState.DRAFT
 
     def test_get_manuscript(self, service: ManuscriptService, db_session: Session, author_id):
-        repo = SQLAlchemyManuscriptRepository(db_session)
+        repo = ManuscriptRepository(db_session)
         manuscript = _make_manuscript(repo, author_id, title="Get Test", source_format=SourceFormat.PDF)
         db_session.commit()
 
@@ -200,7 +200,7 @@ class TestManuscriptService:
             service.get(uuid4())
 
     def test_list_by_author(self, service: ManuscriptService, db_session: Session):
-        author_repo = SQLAlchemyAuthorRepository(db_session)
+        author_repo = AuthorRepository(db_session)
         author_service = AuthorService(author_repo)
         author1 = author_service.create(
             email="author1-list@example.com",
@@ -214,7 +214,7 @@ class TestManuscriptService:
         )
         db_session.commit()
 
-        ms_repo = SQLAlchemyManuscriptRepository(db_session)
+        ms_repo = ManuscriptRepository(db_session)
         _make_manuscript(ms_repo, author1.id, title="Author 1 Book")
         _make_manuscript(ms_repo, author2.id, title="Author 2 Book")
         db_session.commit()
@@ -228,7 +228,7 @@ class TestManuscriptService:
         assert author2_manuscripts[0].title == "Author 2 Book"
 
     def test_update_metadata(self, service: ManuscriptService, db_session: Session, author_id):
-        repo = SQLAlchemyManuscriptRepository(db_session)
+        repo = ManuscriptRepository(db_session)
         manuscript = _make_manuscript(repo, author_id, title="Original")
         db_session.commit()
 
@@ -262,8 +262,8 @@ class TestManuscriptService:
         assert slugs == {"hard-sci-fi", "adventure"}
 
     def test_update_metadata_with_tag_names(self, service: ManuscriptService, db_session: Session, author_id):
-        ms_repo = SQLAlchemyManuscriptRepository(db_session)
-        tag_repo = SQLAlchemyTagRepository(db_session)
+        ms_repo = ManuscriptRepository(db_session)
+        tag_repo = TagRepository(db_session)
         manuscript = _make_manuscript(ms_repo, author_id, title="Book")
         initial_tag = tag_repo.get_or_create("Fantasy", author_id)
         ms_repo.set_tags(manuscript.id, [initial_tag.id])
@@ -283,8 +283,8 @@ class TestManuscriptService:
     def test_update_metadata_without_tag_names_preserves_tags(
         self, service: ManuscriptService, db_session: Session, author_id
     ):
-        ms_repo = SQLAlchemyManuscriptRepository(db_session)
-        tag_repo = SQLAlchemyTagRepository(db_session)
+        ms_repo = ManuscriptRepository(db_session)
+        tag_repo = TagRepository(db_session)
         manuscript = _make_manuscript(ms_repo, author_id, title="Book")
         initial_tag = tag_repo.get_or_create("Fantasy", author_id)
         ms_repo.set_tags(manuscript.id, [initial_tag.id])
@@ -301,7 +301,7 @@ class TestManuscriptService:
         assert updated.tags[0].slug == "fantasy"
 
     def test_mark_ready(self, service: ManuscriptService, db_session: Session, author_id):
-        repo = SQLAlchemyManuscriptRepository(db_session)
+        repo = ManuscriptRepository(db_session)
         manuscript = _make_manuscript(repo, author_id, title="Ready Book")
         db_session.commit()
 
@@ -311,7 +311,7 @@ class TestManuscriptService:
         assert ready.state == ManuscriptState.READY
 
     def test_check_ownership(self, service: ManuscriptService, db_session: Session):
-        author_repo = SQLAlchemyAuthorRepository(db_session)
+        author_repo = AuthorRepository(db_session)
         author_service = AuthorService(author_repo)
         owner = author_service.create(
             email="owner-check@example.com",
@@ -325,7 +325,7 @@ class TestManuscriptService:
         )
         db_session.commit()
 
-        repo = SQLAlchemyManuscriptRepository(db_session)
+        repo = ManuscriptRepository(db_session)
         manuscript = _make_manuscript(repo, owner.id, title="Owned Book")
         db_session.commit()
 
@@ -334,7 +334,7 @@ class TestManuscriptService:
         assert service.check_ownership(uuid4(), owner.id) is False
 
     def test_delete_manuscript(self, service: ManuscriptService, db_session: Session, author_id):
-        repo = SQLAlchemyManuscriptRepository(db_session)
+        repo = ManuscriptRepository(db_session)
         manuscript = _make_manuscript(repo, author_id, title="Delete Me")
         db_session.commit()
 
@@ -346,7 +346,7 @@ class TestManuscriptService:
 
     @pytest.mark.asyncio
     async def test_update_source_deletes_old_file(self, service: ManuscriptService, db_session: Session, author_id):
-        repo = SQLAlchemyManuscriptRepository(db_session)
+        repo = ManuscriptRepository(db_session)
         manuscript = _make_manuscript(repo, author_id)
         db_session.commit()
         old_key = manuscript.source_file_key
@@ -365,7 +365,7 @@ class TestManuscriptService:
 
     @pytest.mark.asyncio
     async def test_update_cover_deletes_old_cover(self, service: ManuscriptService, db_session: Session, author_id):
-        ms_repo = SQLAlchemyManuscriptRepository(db_session)
+        ms_repo = ManuscriptRepository(db_session)
         manuscript = _make_manuscript(ms_repo, author_id)
         manuscript.set_cover("covers/old_cover.jpg")
         ms_repo.update(manuscript)
@@ -386,7 +386,7 @@ class TestManuscriptService:
     async def test_update_cover_skips_delete_if_no_existing_cover(
         self, service: ManuscriptService, db_session: Session, author_id
     ):
-        repo = SQLAlchemyManuscriptRepository(db_session)
+        repo = ManuscriptRepository(db_session)
         manuscript = _make_manuscript(repo, author_id)
         db_session.commit()
 
@@ -403,7 +403,7 @@ class TestManuscriptService:
 
     @pytest.mark.asyncio
     async def test_remove_cover_deletes_file(self, service: ManuscriptService, db_session: Session, author_id):
-        ms_repo = SQLAlchemyManuscriptRepository(db_session)
+        ms_repo = ManuscriptRepository(db_session)
         manuscript = _make_manuscript(ms_repo, author_id)
         manuscript.set_cover("covers/cover.jpg")
         ms_repo.update(manuscript)
@@ -417,7 +417,7 @@ class TestManuscriptService:
 
     @pytest.mark.asyncio
     async def test_remove_cover_no_op_if_no_cover(self, service: ManuscriptService, db_session: Session, author_id):
-        repo = SQLAlchemyManuscriptRepository(db_session)
+        repo = ManuscriptRepository(db_session)
         manuscript = _make_manuscript(repo, author_id)
         db_session.commit()
 
@@ -431,13 +431,13 @@ class TestManuscriptService:
 class TestSampleService:
     @pytest.fixture
     def service(self, db_session: Session) -> SampleService:
-        repo = SQLAlchemySampleRepository(db_session)
+        repo = SampleRepository(db_session)
         return SampleService(repo)
 
     @pytest.fixture
     def manuscript_id(self, db_session: Session):
         """Create an author and manuscript to attach samples to."""
-        author_repo = SQLAlchemyAuthorRepository(db_session)
+        author_repo = AuthorRepository(db_session)
         author_service = AuthorService(author_repo)
         author = author_service.create(
             email="sample-test@example.com",
@@ -446,7 +446,7 @@ class TestSampleService:
         )
         db_session.commit()
 
-        repo = SQLAlchemyManuscriptRepository(db_session)
+        repo = ManuscriptRepository(db_session)
         manuscript = _make_manuscript(repo, author.id, title="Test Manuscript")
         db_session.commit()
         return manuscript.id
@@ -485,7 +485,7 @@ class TestSampleService:
             service.get(uuid4())
 
     def test_list_by_manuscript(self, service: SampleService, db_session: Session):
-        author_repo = SQLAlchemyAuthorRepository(db_session)
+        author_repo = AuthorRepository(db_session)
         author_service = AuthorService(author_repo)
         author = author_service.create(
             email="list-samples-test@example.com",
@@ -494,7 +494,7 @@ class TestSampleService:
         )
         db_session.commit()
 
-        ms_repo = SQLAlchemyManuscriptRepository(db_session)
+        ms_repo = ManuscriptRepository(db_session)
         m1 = _make_manuscript(ms_repo, author.id, title="M1")
         m2 = _make_manuscript(ms_repo, author.id, title="M2")
         db_session.commit()
@@ -545,14 +545,14 @@ class TestSampleService:
 class TestEbookService:
     @pytest.fixture
     def service(self, db_session: Session) -> EbookService:
-        repo = SQLAlchemyEbookRepository(db_session)
-        manuscript_repo = SQLAlchemyManuscriptRepository(db_session)
+        repo = EbookRepository(db_session)
+        manuscript_repo = ManuscriptRepository(db_session)
         return EbookService(repo, manuscript_repo)
 
     @pytest.fixture
     def manuscript_id(self, db_session: Session):
         """Create an author and manuscript to attach ebooks to."""
-        author_repo = SQLAlchemyAuthorRepository(db_session)
+        author_repo = AuthorRepository(db_session)
         author = AuthorService(author_repo).create(
             email="ebook-service-test@example.com",
             password_hash="hash",
@@ -560,7 +560,7 @@ class TestEbookService:
         )
         db_session.commit()
 
-        manuscript_repo = SQLAlchemyManuscriptRepository(db_session)
+        manuscript_repo = ManuscriptRepository(db_session)
         manuscript = _make_manuscript(manuscript_repo, author.id, title="Test Book")
         db_session.commit()
         return manuscript.id
@@ -634,12 +634,12 @@ class TestEbookService:
 
 class TestTagRepository:
     @pytest.fixture
-    def repo(self, db_session: Session) -> SQLAlchemyTagRepository:
-        return SQLAlchemyTagRepository(db_session)
+    def repo(self, db_session: Session) -> TagRepository:
+        return TagRepository(db_session)
 
     @pytest.fixture
     def author_id(self, db_session: Session):
-        author = AuthorService(SQLAlchemyAuthorRepository(db_session)).create(
+        author = AuthorService(AuthorRepository(db_session)).create(
             email="tag-repo-test@example.com",
             password_hash="hash",
             display_name="Tag Test Author",
@@ -649,7 +649,7 @@ class TestTagRepository:
 
     @pytest.fixture
     def other_author_id(self, db_session: Session):
-        author = AuthorService(SQLAlchemyAuthorRepository(db_session)).create(
+        author = AuthorService(AuthorRepository(db_session)).create(
             email="tag-repo-other@example.com",
             password_hash="hash",
             display_name="Other Author",
@@ -659,12 +659,12 @@ class TestTagRepository:
 
     @pytest.fixture
     def manuscript_id(self, db_session: Session, author_id):
-        ms_repo = SQLAlchemyManuscriptRepository(db_session)
+        ms_repo = ManuscriptRepository(db_session)
         manuscript = _make_manuscript(ms_repo, author_id)
         db_session.commit()
         return manuscript.id
 
-    def test_add_persists_tag(self, repo: SQLAlchemyTagRepository, db_session: Session, author_id):
+    def test_add_persists_tag(self, repo: TagRepository, db_session: Session, author_id):
         from app.domain import Tag
         tag = repo.add(Tag(name="Hard Sci-Fi", slug="hard-sci-fi", owner_id=author_id))
         db_session.commit()
@@ -675,7 +675,7 @@ class TestTagRepository:
         assert retrieved.slug == "hard-sci-fi"
         assert retrieved.owner_id == author_id
 
-    def test_update_persists_changes(self, repo: SQLAlchemyTagRepository, db_session: Session, author_id):
+    def test_update_persists_changes(self, repo: TagRepository, db_session: Session, author_id):
         from app.domain import Tag
         tag = repo.add(Tag(name="Hard Sci-Fi", slug="hard-sci-fi", owner_id=author_id))
         db_session.commit()
@@ -689,10 +689,10 @@ class TestTagRepository:
         assert retrieved.name == "Hard Science Fiction"
         assert retrieved.slug == "hard-science-fiction"
 
-    def test_get_returns_none_for_missing(self, repo: SQLAlchemyTagRepository):
+    def test_get_returns_none_for_missing(self, repo: TagRepository):
         assert repo.get(uuid4()) is None
 
-    def test_get_by_slug_returns_tag(self, repo: SQLAlchemyTagRepository, db_session: Session, author_id):
+    def test_get_by_slug_returns_tag(self, repo: TagRepository, db_session: Session, author_id):
         from app.domain import Tag
         repo.add(Tag(name="Cozy Mystery", slug="cozy-mystery", owner_id=author_id))
         db_session.commit()
@@ -702,7 +702,7 @@ class TestTagRepository:
         assert found.name == "Cozy Mystery"
 
     def test_get_by_slug_respects_owner_scope(
-        self, repo: SQLAlchemyTagRepository, db_session: Session, author_id, other_author_id
+        self, repo: TagRepository, db_session: Session, author_id, other_author_id
     ):
         from app.domain import Tag
         # Both authors have the same slug
@@ -720,7 +720,7 @@ class TestTagRepository:
         assert found.id != found_other.id
 
     def test_get_by_slug_returns_none_for_wrong_owner(
-        self, repo: SQLAlchemyTagRepository, db_session: Session, author_id, other_author_id
+        self, repo: TagRepository, db_session: Session, author_id, other_author_id
     ):
         from app.domain import Tag
         repo.add(Tag(name="Thriller", slug="thriller", owner_id=author_id))
@@ -729,7 +729,7 @@ class TestTagRepository:
         assert repo.get_by_slug("thriller", other_author_id) is None
 
     def test_get_or_create_creates_new_tag(
-        self, repo: SQLAlchemyTagRepository, db_session: Session, author_id
+        self, repo: TagRepository, db_session: Session, author_id
     ):
         tag = repo.get_or_create("New Wave", author_id)
         db_session.commit()
@@ -739,7 +739,7 @@ class TestTagRepository:
         assert tag.owner_id == author_id
 
     def test_get_or_create_returns_existing(
-        self, repo: SQLAlchemyTagRepository, db_session: Session, author_id
+        self, repo: TagRepository, db_session: Session, author_id
     ):
         from app.domain import Tag
         existing = repo.add(Tag(name="Romance", slug="romance", owner_id=author_id))
@@ -749,7 +749,7 @@ class TestTagRepository:
         assert tag.id == existing.id
 
     def test_get_or_create_resurrects_soft_deleted(
-        self, repo: SQLAlchemyTagRepository, db_session: Session, author_id
+        self, repo: TagRepository, db_session: Session, author_id
     ):
         from app.domain import Tag
         tag = repo.add(Tag(name="Horror", slug="horror", owner_id=author_id))
@@ -768,10 +768,10 @@ class TestTagRepository:
         assert not resurrected.is_deleted
 
     def test_set_tags_assigns_tags_to_manuscript(
-        self, repo: SQLAlchemyTagRepository, db_session: Session, author_id, manuscript_id
+        self, repo: TagRepository, db_session: Session, author_id, manuscript_id
     ):
         from app.domain import Tag
-        ms_repo = SQLAlchemyManuscriptRepository(db_session)
+        ms_repo = ManuscriptRepository(db_session)
         t1 = repo.add(Tag(name="Sci-Fi", slug="sci-fi", owner_id=author_id))
         t2 = repo.add(Tag(name="Adventure", slug="adventure", owner_id=author_id))
         db_session.commit()
@@ -785,10 +785,10 @@ class TestTagRepository:
         assert t2.id in tag_ids
 
     def test_set_tags_replaces_existing(
-        self, repo: SQLAlchemyTagRepository, db_session: Session, author_id, manuscript_id
+        self, repo: TagRepository, db_session: Session, author_id, manuscript_id
     ):
         from app.domain import Tag
-        ms_repo = SQLAlchemyManuscriptRepository(db_session)
+        ms_repo = ManuscriptRepository(db_session)
         t1 = repo.add(Tag(name="Sci-Fi", slug="sci-fi-replace", owner_id=author_id))
         t2 = repo.add(Tag(name="Adventure", slug="adventure-replace", owner_id=author_id))
         db_session.commit()
@@ -805,10 +805,10 @@ class TestTagRepository:
         assert t1.id not in tag_ids
 
     def test_set_tags_with_empty_list_clears_tags(
-        self, repo: SQLAlchemyTagRepository, db_session: Session, author_id, manuscript_id
+        self, repo: TagRepository, db_session: Session, author_id, manuscript_id
     ):
         from app.domain import Tag
-        ms_repo = SQLAlchemyManuscriptRepository(db_session)
+        ms_repo = ManuscriptRepository(db_session)
         t1 = repo.add(Tag(name="Mystery", slug="mystery-clear", owner_id=author_id))
         db_session.commit()
 
@@ -822,17 +822,17 @@ class TestTagRepository:
         assert manuscript.tags == []
 
     def test_list_popular_orders_by_usage(
-        self, repo: SQLAlchemyTagRepository, db_session: Session, author_id
+        self, repo: TagRepository, db_session: Session, author_id
     ):
         from app.domain import Tag
-        ms_repo = SQLAlchemyManuscriptRepository(db_session)
+        ms_repo = ManuscriptRepository(db_session)
 
         t_popular = repo.add(Tag(name="Popular", slug="popular", owner_id=author_id))
         t_rare = repo.add(Tag(name="Rare", slug="rare", owner_id=author_id))
         db_session.commit()
 
         for i, email in enumerate(["pop1@example.com", "pop2@example.com"]):
-            author = AuthorService(SQLAlchemyAuthorRepository(db_session)).create(
+            author = AuthorService(AuthorRepository(db_session)).create(
                 email=email, password_hash="hash", display_name=f"Author {i}"
             )
             db_session.commit()
@@ -851,7 +851,7 @@ class TestTagRepository:
         assert results[1].id == t_rare.id
 
     def test_list_popular_respects_top_n(
-        self, repo: SQLAlchemyTagRepository, db_session: Session, author_id
+        self, repo: TagRepository, db_session: Session, author_id
     ):
         from app.domain import Tag
         for i in range(5):
@@ -865,11 +865,11 @@ class TestTagRepository:
 class TestTagService:
     @pytest.fixture
     def service(self, db_session: Session) -> TagService:
-        return TagService(SQLAlchemyTagRepository(db_session))
+        return TagService(TagRepository(db_session))
 
     @pytest.fixture
     def author_id(self, db_session: Session):
-        repo = SQLAlchemyAuthorRepository(db_session)
+        repo = AuthorRepository(db_session)
         author = AuthorService(repo).create(
             email="tag-service-test@example.com",
             password_hash="hash",
@@ -880,7 +880,7 @@ class TestTagService:
 
     @pytest.fixture
     def other_author_id(self, db_session: Session):
-        repo = SQLAlchemyAuthorRepository(db_session)
+        repo = AuthorRepository(db_session)
         author = AuthorService(repo).create(
             email="other-tag-service-test@example.com",
             password_hash="hash",

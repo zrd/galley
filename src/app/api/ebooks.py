@@ -15,11 +15,11 @@ from sqlalchemy.orm import Session
 from app.db import get_db
 from app.domain import Download, Ebook, EbookNotFound, ManuscriptNotFound, ManuscriptInDraft
 from app.repositories import (
-    SQLAlchemyAuthorRepository,
-    SQLAlchemyDownloadRepository,
-    SQLAlchemyEbookRepository,
-    SQLAlchemyManuscriptRepository,
-    SQLAlchemySampleRepository,
+    AuthorRepository,
+    DownloadRepository,
+    EbookRepository,
+    ManuscriptRepository,
+    SampleRepository,
 )
 from app.schemas import EbookGenerateRequest, EbookListItem, EbookRead
 from app.schemas.ebook import EbookUpdate
@@ -35,29 +35,29 @@ def _ascii_filename(name: str) -> str:
 
 
 def get_manuscript_service(db: Annotated[Session, Depends(get_db)]) -> ManuscriptService:
-    manuscript_repo = SQLAlchemyManuscriptRepository(db)
-    sample_repo = SQLAlchemySampleRepository(db)
-    ebook_repo = SQLAlchemyEbookRepository(db)
+    manuscript_repo = ManuscriptRepository(db)
+    sample_repo = SampleRepository(db)
+    ebook_repo = EbookRepository(db)
     return ManuscriptService(manuscript_repo, sample_repo, ebook_repo)
 
 
 def get_ebook_service(db: Annotated[Session, Depends(get_db)]) -> EbookService:
-    manuscript_repo = SQLAlchemyManuscriptRepository(db)
-    repo = SQLAlchemyEbookRepository(db)
+    manuscript_repo = ManuscriptRepository(db)
+    repo = EbookRepository(db)
     return EbookService(repo, manuscript_repo)
 
 
 def get_generation_service(db: Annotated[Session, Depends(get_db)]) -> GenerationService:
-    ebook_repo = SQLAlchemyEbookRepository(db)
+    ebook_repo = EbookRepository(db)
     return GenerationService(ebook_repo)
 
 
-def get_download_repo(db: Annotated[Session, Depends(get_db)]) -> SQLAlchemyDownloadRepository:
-    return SQLAlchemyDownloadRepository(db)
+def get_download_repo(db: Annotated[Session, Depends(get_db)]) -> DownloadRepository:
+    return DownloadRepository(db)
 
 
 def get_author_service(db: Annotated[Session, Depends(get_db)]) -> AuthorService:
-    repo = SQLAlchemyAuthorRepository(db)
+    repo = AuthorRepository(db)
     return AuthorService(repo)
 
 
@@ -97,7 +97,7 @@ async def download_ebook(
     ebook_id: UUID,
     request: Request,
     ebook_service: Annotated[EbookService, Depends(get_ebook_service)],
-    download_repo: Annotated[SQLAlchemyDownloadRepository, Depends(get_download_repo)],
+    download_repo: Annotated[DownloadRepository, Depends(get_download_repo)],
     tracking_code: Annotated[str | None, Query(alias="t")] = None,
 ) -> FileResponse:
     """

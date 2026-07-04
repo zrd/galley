@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 
 from app.db import get_db
 from app.domain import ManuscriptNotFound, EbookNotFound, AuthorNotFound, UnlistedDownloadLimitExceeded
-from app.repositories import SQLAlchemyStoreRepository
+from app.repositories import StoreRepository
 from app.schemas import (
     StorePaginatedResponse,
     StoreBrowseItem,
@@ -25,7 +25,7 @@ from app.services import StoreService
 router = APIRouter()
 
 def get_store_service(db: Annotated[Session, Depends(get_db)]) -> StoreService:
-    repo = SQLAlchemyStoreRepository(db)
+    repo = StoreRepository(db)
     return StoreService(repo)
 
 

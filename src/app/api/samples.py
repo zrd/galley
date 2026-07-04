@@ -13,9 +13,9 @@ from sqlalchemy.orm import Session
 from app.db import get_db
 from app.domain import ManuscriptNotFound, SampleNotFound
 from app.repositories import (
-    SQLAlchemyEbookRepository,
-    SQLAlchemyManuscriptRepository,
-    SQLAlchemySampleRepository,
+    EbookRepository,
+    ManuscriptRepository,
+    SampleRepository,
 )
 from app.schemas import EbookGenerateRequest, EbookRead, SampleCreate, SampleRead, SampleUpdate
 from app.security.auth import CurrentAuthorId
@@ -31,25 +31,25 @@ router = APIRouter()
 
 
 def get_manuscript_service(db: Annotated[Session, Depends(get_db)]) -> ManuscriptService:
-    manuscript_repo = SQLAlchemyManuscriptRepository(db)
-    sample_repo = SQLAlchemySampleRepository(db)
-    ebook_repo = SQLAlchemyEbookRepository(db)
+    manuscript_repo = ManuscriptRepository(db)
+    sample_repo = SampleRepository(db)
+    ebook_repo = EbookRepository(db)
     return ManuscriptService(manuscript_repo, sample_repo, ebook_repo)
 
 
 def get_sample_service(db: Annotated[Session, Depends(get_db)]) -> SampleService:
-    repo = SQLAlchemySampleRepository(db)
-    ebook_repo = SQLAlchemyEbookRepository(db)
+    repo = SampleRepository(db)
+    ebook_repo = EbookRepository(db)
     return SampleService(repo, ebook_repo)
 
 
 def get_ebook_service(db: Annotated[Session, Depends(get_db)]) -> EbookService:
-    repo = SQLAlchemyEbookRepository(db)
+    repo = EbookRepository(db)
     return EbookService(repo)
 
 
 def get_generation_service(db: Annotated[Session, Depends(get_db)]) -> GenerationService:
-    ebook_repo = SQLAlchemyEbookRepository(db)
+    ebook_repo = EbookRepository(db)
     return GenerationService(ebook_repo)
 
 
