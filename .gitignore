@@ -32,6 +32,8 @@ ENV/
 
 # Environment variables
 .env
+.env.local
+.env.*.local
 
 # Local storage (root only, not src/app/storage/)
 /storage/
@@ -58,4 +60,3 @@ npm-debug.log*
 # OS files
 .DS_Store
 Thumbs.db
-docs/tickets-local
