@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from uuid import UUID, uuid4
 
 from .enums import ManuscriptState, SourceFormat
@@ -20,8 +20,8 @@ class Manuscript:
     tags: list[Tag] = field(default_factory=list)
     cover_image_key: str | None = None
     state: ManuscriptState = ManuscriptState.DRAFT
-    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
-    updated_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     deleted_at: datetime | None = None
 
     @property
@@ -29,7 +29,7 @@ class Manuscript:
         return self.deleted_at is not None
 
     def soft_delete(self) -> None:
-        self.deleted_at = datetime.now(timezone.utc)
+        self.deleted_at = datetime.now(UTC)
 
     def restore(self) -> None:
         self.deleted_at = None
@@ -92,7 +92,7 @@ class Manuscript:
         return self.state == ManuscriptState.READY
 
     def _touch(self) -> None:
-        self.updated_at = datetime.now(timezone.utc)
+        self.updated_at = datetime.now(UTC)
 
     def set_cover(self, key: str) -> None:
         self.cover_image_key = key

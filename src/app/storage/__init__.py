@@ -1,6 +1,11 @@
 from .local import LocalStorageBackend
 from .protocol import StorageBackend
-from .service import generate_file_key, get_content_type_for_format, get_storage_backend, validate_image
+from .service import (
+    generate_file_key,
+    get_content_type_for_format,
+    get_storage_backend,
+    validate_image,
+)
 
 __all__ = [
     "LocalStorageBackend",

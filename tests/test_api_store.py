@@ -11,7 +11,6 @@ from sqlalchemy.orm import Session
 
 from app.db.models import EbookModel
 
-
 SAMPLE_EPUB = b"PK\x03\x04" + b"x" * 1000
 
 

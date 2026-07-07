@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from uuid import UUID, uuid4
 
 
@@ -25,8 +25,8 @@ class Sample:
     id: UUID = field(default_factory=uuid4)
     promo_header: str | None = None
     promo_footer: str | None = None
-    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
-    updated_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     deleted_at: datetime | None = None
 
     @property
@@ -34,7 +34,7 @@ class Sample:
         return self.deleted_at is not None
 
     def soft_delete(self) -> None:
-        self.deleted_at = datetime.now(timezone.utc)
+        self.deleted_at = datetime.now(UTC)
 
     def restore(self) -> None:
         self.deleted_at = None
@@ -62,4 +62,4 @@ class Sample:
         self._touch()
 
     def _touch(self) -> None:
-        self.updated_at = datetime.now(timezone.utc)
+        self.updated_at = datetime.now(UTC)

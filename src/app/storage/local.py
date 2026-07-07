@@ -92,7 +92,7 @@ class LocalStorageBackend:
         meta_path = full_path.with_suffix(full_path.suffix + ".meta")
 
         if meta_path.exists():
-            async with aiofiles.open(meta_path, "r") as f:
+            async with aiofiles.open(meta_path) as f:
                 return await f.read()
 
         # Default content type based on extension

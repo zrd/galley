@@ -1,7 +1,7 @@
 from datetime import datetime
 from uuid import UUID
 
-from pydantic import BaseModel, Field, field_validator, computed_field
+from pydantic import BaseModel, Field, computed_field, field_validator
 
 from app.domain import ManuscriptState, SourceFormat
 from app.schemas.genre import GenreRead

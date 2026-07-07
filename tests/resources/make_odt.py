@@ -1,4 +1,5 @@
-import zipfile, textwrap, os
+import os
+import zipfile
 
 # --- content.xml ---
 content = '''<?xml version="1.0" encoding="UTF-8"?>

@@ -5,7 +5,7 @@ Covers sort ordering and genre tree assembly — logic that the API tests don't
 exercise at enough granularity.
 """
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from uuid import uuid4
 
 import pytest
@@ -23,7 +23,6 @@ from app.db.models import (
 from app.domain.enums import ManuscriptState, OutputFormat, SourceFormat, Visibility
 from app.repositories import StoreRepository
 from app.services import StoreService
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -63,7 +62,7 @@ def _ebook(
     sale_price_cents: int | None = None,
 ) -> EbookModel:
     if visibility == Visibility.PUBLISHED and published_at is None:
-        published_at = datetime.now(timezone.utc)
+        published_at = datetime.now(UTC)
     e = EbookModel(
         manuscript_id=manuscript_id,
         output_format=OutputFormat.EPUB,
@@ -99,7 +98,7 @@ def _tag(db: Session, owner_id, name: str) -> TagModel:
 # Fixtures
 # ---------------------------------------------------------------------------
 
-NOW = datetime.now(timezone.utc)
+NOW = datetime.now(UTC)
 EARLIER = NOW - timedelta(days=10)
 
 
@@ -345,7 +344,7 @@ class TestBrowseListingsFilters:
         author = _author(db_session)
         m = _manuscript(db_session, author.id)
         _ebook(db_session, m.id)
-        m.deleted_at = datetime.now(timezone.utc)
+        m.deleted_at = datetime.now(UTC)
         db_session.commit()
 
         _, total = repo.browse_listings(offset=0, limit=10)
@@ -422,7 +421,7 @@ class TestGetListing:
         author = _author(db_session)
         m = _manuscript(db_session, author.id)
         _ebook(db_session, m.id)
-        m.deleted_at = datetime.now(timezone.utc)
+        m.deleted_at = datetime.now(UTC)
         db_session.commit()
 
         assert repo.get_listing(m.id) is None
@@ -476,7 +475,7 @@ class TestGetEdition:
         author = _author(db_session)
         m = _manuscript(db_session, author.id)
         e = _ebook(db_session, m.id, visibility=Visibility.PUBLISHED)
-        e.deleted_at = datetime.now(timezone.utc)
+        e.deleted_at = datetime.now(UTC)
         db_session.commit()
 
         assert repo.get_edition(e.id) is None
@@ -515,7 +514,7 @@ class TestGetAuthorProfile:
 
     def test_returns_none_for_deleted_author(self, repo: StoreRepository, db_session: Session):
         author = _author(db_session, is_public=True)
-        author.deleted_at = datetime.now(timezone.utc)
+        author.deleted_at = datetime.now(UTC)
         db_session.commit()
 
         assert repo.get_author_profile(author.id) is None
@@ -546,7 +545,7 @@ class TestGetAuthorProfile:
     def test_excludes_deleted_manuscripts(self, repo: StoreRepository, db_session: Session):
         author = _author(db_session, is_public=True)
         m = _manuscript(db_session, author.id)
-        m.deleted_at = datetime.now(timezone.utc)
+        m.deleted_at = datetime.now(UTC)
         db_session.commit()
 
         result = repo.get_author_profile(author.id)
@@ -570,7 +569,7 @@ class TestListAuthorProfiles:
 
     def test_excludes_deleted_authors(self, repo: StoreRepository, db_session: Session):
         a = _author(db_session, is_public=True)
-        a.deleted_at = datetime.now(timezone.utc)
+        a.deleted_at = datetime.now(UTC)
         db_session.commit()
 
         _, total = repo.list_author_profiles(offset=0, limit=10)

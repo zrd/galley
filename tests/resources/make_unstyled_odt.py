@@ -1,4 +1,5 @@
-import zipfile, os
+import os
+import zipfile
 
 # An ODT with no recognized paragraph or character styles.
 # Pandoc will see the text but won't map it to headings or body content,

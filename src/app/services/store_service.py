@@ -2,7 +2,13 @@ from collections.abc import Sequence
 from uuid import UUID
 
 from app.db import AuthorModel, EbookModel, GenreModel, ManuscriptModel
-from app.domain import AuthorNotFound, EbookNotFound, ManuscriptNotFound, UnlistedDownloadLimitExceeded, Visibility
+from app.domain import (
+    AuthorNotFound,
+    EbookNotFound,
+    ManuscriptNotFound,
+    UnlistedDownloadLimitExceeded,
+    Visibility,
+)
 from app.repositories import StoreRepository
 from app.schemas.genre import StoreGenreTree
 

@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from uuid import UUID
 
 from sqlalchemy import select
@@ -71,7 +71,7 @@ class AuthorRepository:
     def soft_delete(self, author_id: UUID) -> None:
         model = self.session.get(AuthorModel, author_id)
         if model:
-            model.deleted_at = datetime.now(timezone.utc)
+            model.deleted_at = datetime.now(UTC)
             self.session.flush()
 
     def restore(self, author_id: UUID) -> None:

@@ -14,11 +14,9 @@ from sqlalchemy import create_engine, event
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from app.db import Base
+from app.db import Base, get_db
 from app.main import app
-from app.db import get_db
-from app.storage import get_storage_backend, LocalStorageBackend
-
+from app.storage import LocalStorageBackend
 
 # Create an in-memory SQLite database for testing
 SQLALCHEMY_TEST_DATABASE_URL = "sqlite:///:memory:"
@@ -83,17 +81,15 @@ def client(db_session: Session, test_storage: LocalStorageBackend) -> Generator[
     app.dependency_overrides[get_db] = override_get_db
 
     # Override storage backend
-    original_get_storage = get_storage_backend
-
     def override_get_storage():
         return test_storage
 
     # Patch the storage module in all places it's imported
-    import app.storage as storage_module
-    import app.api.manuscripts as manuscripts_module
     import app.api.ebooks as ebooks_module
+    import app.api.manuscripts as manuscripts_module
     import app.services.generation_service as generation_service_module
     import app.services.manuscript_service as manuscript_service_module
+    import app.storage as storage_module
 
     original_storage_func = storage_module.get_storage_backend
     storage_module.get_storage_backend = override_get_storage

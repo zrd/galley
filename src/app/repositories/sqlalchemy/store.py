@@ -1,17 +1,17 @@
 from collections.abc import Sequence
 from uuid import UUID
 
-from sqlalchemy import func, select,case
+from sqlalchemy import case, func, select
 from sqlalchemy.orm import Session, joinedload, selectinload
 
 from app.db.models import (
     AuthorModel,
     EbookModel,
     GenreModel,
-    ManuscriptModel,
     ManuscriptGenreModel,
-    TagModel,
+    ManuscriptModel,
     ManuscriptTagModel,
+    TagModel,
 )
 from app.domain import Visibility
 
