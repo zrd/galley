@@ -313,6 +313,74 @@ wheels = [
 ]
 
 [[package]]
+name = "galley"
+version = "0.1.0"
+source = { virtual = "." }
+dependencies = [
+    { name = "aiofiles" },
+    { name = "alembic" },
+    { name = "asyncpg" },
+    { name = "bcrypt" },
+    { name = "email-validator" },
+    { name = "fastapi" },
+    { name = "psycopg", extra = ["binary"] },
+    { name = "pydantic" },
+    { name = "pydantic-settings" },
+    { name = "pyjwt" },
+    { name = "python-multipart" },
+    { name = "python-slugify" },
+    { name = "sqlalchemy" },
+    { name = "typing-extensions" },
+    { name = "uvicorn", extra = ["standard"] },
+]
+
+[package.optional-dependencies]
+dev = [
+    { name = "httpx" },
+    { name = "mypy" },
+    { name = "pytest" },
+    { name = "pytest-asyncio" },
+    { name = "pytest-cov" },
+    { name = "ruff" },
+    { name = "types-aiofiles" },
+]
+
+[package.dev-dependencies]
+dev = [
+    { name = "pytest-xdist" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "aiofiles", specifier = ">=23.2" },
+    { name = "alembic", specifier = ">=1.13" },
+    { name = "asyncpg", specifier = ">=0.29" },
+    { name = "bcrypt", specifier = ">=4.1" },
+    { name = "email-validator", specifier = ">=2.1" },
+    { name = "fastapi", specifier = ">=0.110" },
+    { name = "httpx", marker = "extra == 'dev'", specifier = ">=0.26" },
+    { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.8" },
+    { name = "psycopg", extras = ["binary"], specifier = ">=3.1" },
+    { name = "pydantic", specifier = ">=2.6" },
+    { name = "pydantic-settings" },
+    { name = "pyjwt", specifier = ">=2.8" },
+    { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.0" },
+    { name = "pytest-asyncio", marker = "extra == 'dev'", specifier = ">=0.23" },
+    { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=4.1" },
+    { name = "python-multipart", specifier = ">=0.0.9" },
+    { name = "python-slugify" },
+    { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.3" },
+    { name = "sqlalchemy", specifier = ">=2.0" },
+    { name = "types-aiofiles", marker = "extra == 'dev'", specifier = ">=23.2" },
+    { name = "typing-extensions", specifier = ">=4.10" },
+    { name = "uvicorn", extras = ["standard"], specifier = ">=0.27" },
+]
+provides-extras = ["dev"]
+
+[package.metadata.requires-dev]
+dev = [{ name = "pytest-xdist", specifier = ">=3.8.0" }]
+
+[[package]]
 name = "greenlet"
 version = "3.3.1"
 source = { registry = "https://pypi.org/simple" }
@@ -968,74 +1036,6 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/58/f1/90ddc533918d3a2ad628bc3044cdfc094949e6d4b929220c3f0eb8a1c998/ruff-0.14.11-py3-none-win_amd64.whl", hash = "sha256:f981cea63d08456b2c070e64b79cb62f951aa1305282974d4d5216e6e0178ae6", size = 14001379, upload-time = "2026-01-08T19:11:52.591Z" },
     { url = "https://files.pythonhosted.org/packages/c4/1c/1dbe51782c0e1e9cfce1d1004752672d2d4629ea46945d19d731ad772b3b/ruff-0.14.11-py3-none-win_arm64.whl", hash = "sha256:649fb6c9edd7f751db276ef42df1f3df41c38d67d199570ae2a7bd6cbc3590f0", size = 12938644, upload-time = "2026-01-08T19:11:50.027Z" },
 ]
-
-[[package]]
-name = "self-publishing"
-version = "0.1.0"
-source = { virtual = "." }
-dependencies = [
-    { name = "aiofiles" },
-    { name = "alembic" },
-    { name = "asyncpg" },
-    { name = "bcrypt" },
-    { name = "email-validator" },
-    { name = "fastapi" },
-    { name = "psycopg", extra = ["binary"] },
-    { name = "pydantic" },
-    { name = "pydantic-settings" },
-    { name = "pyjwt" },
-    { name = "python-multipart" },
-    { name = "python-slugify" },
-    { name = "sqlalchemy" },
-    { name = "typing-extensions" },
-    { name = "uvicorn", extra = ["standard"] },
-]
-
-[package.optional-dependencies]
-dev = [
-    { name = "httpx" },
-    { name = "mypy" },
-    { name = "pytest" },
-    { name = "pytest-asyncio" },
-    { name = "pytest-cov" },
-    { name = "ruff" },
-    { name = "types-aiofiles" },
-]
-
-[package.dev-dependencies]
-dev = [
-    { name = "pytest-xdist" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "aiofiles", specifier = ">=23.2" },
-    { name = "alembic", specifier = ">=1.13" },
-    { name = "asyncpg", specifier = ">=0.29" },
-    { name = "bcrypt", specifier = ">=4.1" },
-    { name = "email-validator", specifier = ">=2.1" },
-    { name = "fastapi", specifier = ">=0.110" },
-    { name = "httpx", marker = "extra == 'dev'", specifier = ">=0.26" },
-    { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.8" },
-    { name = "psycopg", extras = ["binary"], specifier = ">=3.1" },
-    { name = "pydantic", specifier = ">=2.6" },
-    { name = "pydantic-settings" },
-    { name = "pyjwt", specifier = ">=2.8" },
-    { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.0" },
-    { name = "pytest-asyncio", marker = "extra == 'dev'", specifier = ">=0.23" },
-    { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=4.1" },
-    { name = "python-multipart", specifier = ">=0.0.9" },
-    { name = "python-slugify" },
-    { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.3" },
-    { name = "sqlalchemy", specifier = ">=2.0" },
-    { name = "types-aiofiles", marker = "extra == 'dev'", specifier = ">=23.2" },
-    { name = "typing-extensions", specifier = ">=4.10" },
-    { name = "uvicorn", extras = ["standard"], specifier = ">=0.27" },
-]
-provides-extras = ["dev"]
-
-[package.metadata.requires-dev]
-dev = [{ name = "pytest-xdist", specifier = ">=3.8.0" }]
 
 [[package]]
 name = "sqlalchemy"
