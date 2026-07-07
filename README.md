@@ -44,7 +44,3 @@ Copy `.env.example` → `.env` and `frontend/.env.example` → `frontend/.env` b
 ```bash
 make test
 ```
-
-### Roadmap
-
-See [galley-tickets](https://github.com/zrd/galley-tickets) for the full project board. High-level: public store API is done, frontend store views and acquisition flow are next.

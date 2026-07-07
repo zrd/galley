@@ -1,6 +1,6 @@
 ## galley / frontend
 
-### This Is Not A Design
+### Sample/demo GUI
 
 This frontend exists to test and develop the API. It is functional, not precious. If you are building on galley, you are not expected — or encouraged — to build on top of this. Replace it entirely with something that reflects your project.
 
