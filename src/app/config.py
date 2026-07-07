@@ -14,7 +14,7 @@ class Settings(BaseSettings):
     DEV_API_KEY: str = "dev-secret"
 
     # Database
-    DATABASE_URL: str = "postgresql+psycopg://postgres:postgres@localhost:5432/self_publishing"
+    DATABASE_URL: str = "postgresql+psycopg://postgres:postgres@localhost:5432/galley"
 
     # JWT Auth
     JWT_SECRET_KEY: str = "dev-secret-key-change-in-production"
