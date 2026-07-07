@@ -1,5 +1,8 @@
 ## galley
 
+[![Backend CI](https://github.com/zrd/galley/actions/workflows/ci-backend.yml/badge.svg)](https://github.com/zrd/galley/actions/workflows/ci-backend.yml)
+[![Frontend CI](https://github.com/zrd/galley/actions/workflows/ci-frontend.yml/badge.svg)](https://github.com/zrd/galley/actions/workflows/ci-frontend.yml)
+
 ### Ebook Publishing Platform
 
 Galley is an ebook store and sample distribution platform for self-published and aspiring authors. Sell your work, share samples, build your readership.
