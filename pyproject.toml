@@ -1,13 +1,13 @@
 [project]
-name = "self-publishing"
+name = "galley"
 version = "0.1.0"
-description = "Publish documents yourself"
+description = "Ebook store and sample distribution platform for self-published authors"
 readme = "README.md"
 requires-python = ">=3.12"
-license = { text = "MIT" }
+license = { text = "AGPL-3.0" }
 
 authors = [
-  { name = "Your Name", email = "you@example.com" }
+  { name = "Zach Dinkmeyer", email = "zach.dinkmeyer@gmail.com" }
 ]
 
 dependencies = [
