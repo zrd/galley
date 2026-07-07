@@ -1,12 +1,12 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from uuid import UUID
 
-from sqlalchemy import delete, func, select, update, or_, case
-from sqlalchemy.orm import Session, joinedload, selectinload
+from sqlalchemy import delete, select
+from sqlalchemy.orm import Session
 
 from app.db.models import (
-    ManuscriptModel,
     ManuscriptGenreModel,
+    ManuscriptModel,
     ManuscriptTagModel,
 )
 from app.domain import Manuscript
@@ -77,7 +77,7 @@ class ManuscriptRepository:
     def soft_delete(self, manuscript_id: UUID) -> None:
         model = self.session.get(ManuscriptModel, manuscript_id)
         if model:
-            model.deleted_at = datetime.now(timezone.utc)
+            model.deleted_at = datetime.now(UTC)
             self.session.flush()
 
     def restore(self, manuscript_id: UUID) -> None:

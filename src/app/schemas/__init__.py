@@ -1,7 +1,7 @@
 from .auth import LoginRequest, RefreshRequest, TokenResponse
-from .author import AuthorCreate, AuthorRead, AuthorUpdate, AuthorPublicRead
+from .author import AuthorCreate, AuthorPublicRead, AuthorRead, AuthorUpdate
 from .ebook import EbookGenerateRequest, EbookListItem, EbookRead
-from .genre import GenreCreate, GenreRead, GenreListItem, GenreTree, StoreGenreTree
+from .genre import GenreCreate, GenreListItem, GenreRead, GenreTree
 from .manuscript import ManuscriptCreate, ManuscriptListItem, ManuscriptRead, ManuscriptUpdate
 from .sample import SampleCreate, SampleRead, SampleUpdate
 from .store import (
@@ -36,7 +36,6 @@ __all__ = [
     "GenreRead",
     "GenreListItem",
     "GenreTree",
-    "StoreGenreTree",
     # Manuscript
     "ManuscriptCreate",
     "ManuscriptListItem",

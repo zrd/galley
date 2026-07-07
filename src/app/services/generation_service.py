@@ -7,7 +7,6 @@ Handles generating ebooks from manuscripts, including:
 """
 
 import re
-from uuid import UUID
 
 from app.domain import Ebook, Manuscript, OutputFormat, Sample
 from app.repositories import EbookRepository

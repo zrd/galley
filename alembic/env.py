@@ -2,8 +2,9 @@ import sys
 from logging.config import fileConfig
 from pathlib import Path
 
-from alembic import context
 from sqlalchemy import engine_from_config, pool
+
+from alembic import context
 
 # Add src to path so we can import app modules
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))

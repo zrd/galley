@@ -13,7 +13,7 @@ from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
 from app.db import get_db
-from app.domain import Download, Ebook, EbookNotFound, ManuscriptNotFound, ManuscriptInDraft
+from app.domain import Download, Ebook, EbookNotFound, ManuscriptInDraft, ManuscriptNotFound
 from app.repositories import (
     AuthorRepository,
     DownloadRepository,
@@ -24,7 +24,13 @@ from app.repositories import (
 from app.schemas import EbookGenerateRequest, EbookListItem, EbookRead
 from app.schemas.ebook import EbookUpdate
 from app.security.auth import CurrentAuthorId
-from app.services import AuthorService, EbookService, GenerationError, GenerationService, ManuscriptService
+from app.services import (
+    AuthorService,
+    EbookService,
+    GenerationError,
+    GenerationService,
+    ManuscriptService,
+)
 from app.storage import get_content_type_for_format, get_storage_backend
 
 router = APIRouter()

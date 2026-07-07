@@ -11,7 +11,6 @@ Provides format conversion between supported document formats:
 import asyncio
 import logging
 import tempfile
-
 from pathlib import Path
 
 from app.domain import OutputFormat, SourceFormat

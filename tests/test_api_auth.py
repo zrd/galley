@@ -5,7 +5,6 @@ Integration tests for authentication API endpoints.
 import uuid
 from datetime import timedelta
 
-import pytest
 from fastapi.testclient import TestClient
 
 from app.security.auth import create_access_token, create_refresh_token

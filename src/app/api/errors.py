@@ -10,13 +10,9 @@ from fastapi.responses import JSONResponse
 from app.domain import (
     AuthenticationError,
     AuthorizationError,
-    AuthorNotFound,
     DomainError,
-    EbookNotFound,
     EntityNotFound,
     InvalidStateTransition,
-    ManuscriptNotFound,
-    SampleNotFound,
 )
 from app.services import ConversionError, GenerationError
 

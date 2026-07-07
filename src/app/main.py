@@ -7,11 +7,11 @@ from app.api import (
     debug_router,
     ebooks_router,
     genres_router,
-    tags_router,
     health_router,
     manuscripts_router,
     samples_router,
     store_router,
+    tags_router,
 )
 from app.api.errors import register_error_handlers
 from app.config import settings

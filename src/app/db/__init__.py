@@ -1,5 +1,13 @@
 from .base import Base, SessionLocal, engine, get_db
-from .models import AuthorModel, DownloadModel, EbookModel, GenreModel, ManuscriptModel, SampleModel, TagModel
+from .models import (
+    AuthorModel,
+    DownloadModel,
+    EbookModel,
+    GenreModel,
+    ManuscriptModel,
+    SampleModel,
+    TagModel,
+)
 
 __all__ = [
     "Base",

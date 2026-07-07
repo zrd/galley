@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from uuid import UUID, uuid4
 
 from .enums import OutputFormat, Visibility
@@ -27,7 +27,7 @@ class Ebook:
     download_count: int = 0
     visibility: Visibility = Visibility.PRIVATE
     unlisted_download_limit: int | None  = None     # Max downloads when UNLISTED (None = unlimited)
-    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     published_at: datetime | None = None            # Set when first published, never reset
     deleted_at: datetime | None = None
 
@@ -64,7 +64,7 @@ class Ebook:
             return f"{major_currency_symbol}{major}.{minor:02d}"
 
     def soft_delete(self) -> None:
-        self.deleted_at = datetime.now(timezone.utc)
+        self.deleted_at = datetime.now(UTC)
 
     def restore(self) -> None:
         self.deleted_at = None
@@ -76,7 +76,7 @@ class Ebook:
     def publish(self):
         self.visibility = Visibility.PUBLISHED
         if self.published_at is None:
-            self.published_at = datetime.now(timezone.utc)
+            self.published_at = datetime.now(UTC)
 
     def unlist(self):
         self.visibility = Visibility.UNLISTED

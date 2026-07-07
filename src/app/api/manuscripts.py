@@ -10,7 +10,7 @@ from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
 from app.db import get_db
-from app.domain import ManuscriptNotFound, SourceFormat, InvalidStateTransition
+from app.domain import InvalidStateTransition, ManuscriptNotFound, SourceFormat
 from app.repositories import (
     EbookRepository,
     ManuscriptRepository,
@@ -19,7 +19,7 @@ from app.repositories import (
 )
 from app.schemas import ManuscriptListItem, ManuscriptRead, ManuscriptUpdate
 from app.security.auth import CurrentAuthorId
-from app.services import EbookService, ManuscriptService, SampleService
+from app.services import ManuscriptService
 from app.storage import get_content_type_for_format, get_storage_backend
 
 router = APIRouter()

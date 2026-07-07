@@ -4,8 +4,6 @@ Tests for authentication module.
 
 from uuid import uuid4
 
-import pytest
-
 from app.security.auth import (
     create_access_token,
     create_refresh_token,

@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from uuid import UUID
 
 from sqlalchemy import delete, select, update
@@ -107,11 +107,11 @@ class EbookRepository:
     def soft_delete(self, ebook_id: UUID) -> None:
         model = self.session.get(EbookModel, ebook_id)
         if model:
-            model.deleted_at = datetime.now(timezone.utc)
+            model.deleted_at = datetime.now(UTC)
             self.session.flush()
 
     def soft_delete_by_manuscript(self, manuscript_id: UUID) -> None:
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         stmt = update(EbookModel).where(
             EbookModel.manuscript_id == manuscript_id, EbookModel.deleted_at.is_(None)
         ).values(deleted_at=now)
@@ -119,7 +119,7 @@ class EbookRepository:
         self.session.flush()
 
     def soft_delete_by_sample(self, sample_id: UUID) -> None:
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         stmt = update(EbookModel).where(
             EbookModel.sample_id == sample_id, EbookModel.deleted_at.is_(None)
         ).values(deleted_at=now)

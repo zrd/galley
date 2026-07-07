@@ -2,12 +2,12 @@
 Tests for domain entities and business logic.
 """
 
+from datetime import UTC, datetime
+
 import pytest
-from datetime import datetime, timezone
 from pydantic import ValidationError
 
 from app.domain import (
-    Author,
     Ebook,
     InvalidStateTransition,
     Manuscript,
@@ -39,14 +39,14 @@ class TestTag:
         tag = Tag(
             name="Cozy Mystery",
             slug="cozy-mystery",
-            deleted_at=datetime.now(timezone.utc),
+            deleted_at=datetime.now(UTC),
         )
         assert tag.is_deleted
 
     def test_created_at_defaults_to_now(self):
-        before = datetime.now(timezone.utc)
+        before = datetime.now(UTC)
         tag = Tag(name="Fantasy", slug="fantasy")
-        after = datetime.now(timezone.utc)
+        after = datetime.now(UTC)
 
         assert before <= tag.created_at <= after
 
@@ -64,7 +64,7 @@ class TestTag:
         assert tag.is_deleted
 
     def test_restore_clears_deleted_at(self):
-        tag = Tag(name="Fantasy", slug="fantasy", deleted_at=datetime.now(timezone.utc))
+        tag = Tag(name="Fantasy", slug="fantasy", deleted_at=datetime.now(UTC))
         assert tag.is_deleted
 
         tag.restore()
@@ -461,9 +461,9 @@ class TestEbookVisibility:
         assert ebook.visibility == Visibility.PUBLISHED
 
     def test_publish_sets_published_at(self, ebook):
-        before = datetime.now(timezone.utc)
+        before = datetime.now(UTC)
         ebook.publish()
-        after = datetime.now(timezone.utc)
+        after = datetime.now(UTC)
         assert before <= ebook.published_at <= after
 
     def test_publish_twice_does_not_reset_published_at(self, ebook):

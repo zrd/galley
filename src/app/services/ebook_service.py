@@ -1,6 +1,13 @@
 from uuid import UUID
 
-from app.domain import Ebook, EbookNotFound, OutputFormat, ManuscriptNotFound, ManuscriptInDraft, ManuscriptState
+from app.domain import (
+    Ebook,
+    EbookNotFound,
+    ManuscriptInDraft,
+    ManuscriptNotFound,
+    ManuscriptState,
+    OutputFormat,
+)
 from app.repositories import EbookRepository, ManuscriptRepository
 from app.schemas.ebook import EbookUpdate
 

@@ -2,7 +2,6 @@
 Integration tests for genre API endpoints.
 """
 
-import pytest
 from fastapi.testclient import TestClient
 
 

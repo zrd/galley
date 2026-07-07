@@ -4,7 +4,7 @@ Storage service that provides access to the configured storage backend.
 
 import hashlib
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from functools import lru_cache
 
 from app.config import settings
@@ -52,7 +52,7 @@ def generate_file_key(
     Returns:
         A unique storage key
     """
-    timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+    timestamp = datetime.now(UTC).strftime("%Y%m%d_%H%M%S")
     unique_hash = hashlib.sha256(
         f"{author_id}{timestamp}{uuid.uuid4()}".encode()
     ).hexdigest()[:12]

@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 
 from app.db import get_db
 from app.repositories import AuthorRepository
-from app.schemas import AuthorCreate, AuthorRead, LoginRequest, RefreshRequest, TokenResponse
+from app.schemas import AuthorCreate, LoginRequest, RefreshRequest, TokenResponse
 from app.security.auth import (
     create_access_token,
     create_refresh_token,

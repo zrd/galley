@@ -8,7 +8,16 @@ from uuid import uuid4
 import pytest
 from sqlalchemy.orm import Session
 
-from app.domain import AuthorNotFound, Manuscript, ManuscriptNotFound, ManuscriptState, OutputFormat, SampleNotFound, SourceFormat, TagNotFound
+from app.domain import (
+    AuthorNotFound,
+    Manuscript,
+    ManuscriptNotFound,
+    ManuscriptState,
+    OutputFormat,
+    SampleNotFound,
+    SourceFormat,
+    TagNotFound,
+)
 from app.repositories import (
     AuthorRepository,
     EbookRepository,

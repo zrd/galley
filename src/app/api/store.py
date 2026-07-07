@@ -5,20 +5,25 @@ Customer facing store endpoints
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Query, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from app.db import get_db
-from app.domain import ManuscriptNotFound, EbookNotFound, AuthorNotFound, UnlistedDownloadLimitExceeded
+from app.domain import (
+    AuthorNotFound,
+    EbookNotFound,
+    ManuscriptNotFound,
+    UnlistedDownloadLimitExceeded,
+)
 from app.repositories import StoreRepository
 from app.schemas import (
-    StorePaginatedResponse,
+    StoreAuthorDetail,
+    StoreAuthorListItem,
     StoreBrowseItem,
     StoreEditionDetail,
     StoreGenreTree,
-    StoreAuthorListItem,
-    StoreAuthorDetail,
     StoreManuscriptDetail,
+    StorePaginatedResponse,
 )
 from app.services import StoreService
 

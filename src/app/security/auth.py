@@ -7,7 +7,7 @@ Provides:
 - FastAPI dependencies for protected routes
 """
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Annotated
 from uuid import UUID
 
@@ -47,7 +47,7 @@ def create_access_token(author_id: UUID, expires_delta: timedelta | None = None)
     if expires_delta is None:
         expires_delta = timedelta(minutes=settings.JWT_ACCESS_TOKEN_EXPIRE_MINUTES)
 
-    expire = datetime.now(timezone.utc) + expires_delta
+    expire = datetime.now(UTC) + expires_delta
     payload = {
         "sub": str(author_id),
         "exp": expire,
@@ -70,7 +70,7 @@ def create_refresh_token(author_id: UUID, expires_delta: timedelta | None = None
     if expires_delta is None:
         expires_delta = timedelta(days=settings.JWT_REFRESH_TOKEN_EXPIRE_DAYS)
 
-    expire = datetime.now(timezone.utc) + expires_delta
+    expire = datetime.now(UTC) + expires_delta
     payload = {
         "sub": str(author_id),
         "exp": expire,

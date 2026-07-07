@@ -4,7 +4,7 @@ from slugify import slugify
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.db.models import TagModel, ManuscriptTagModel
+from app.db.models import ManuscriptTagModel, TagModel
 from app.domain import Tag
 
 from ._mappers import tag_model_to_domain
