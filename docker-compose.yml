@@ -1,17 +1,17 @@
 services:
   postgres:
     image: postgres:16-alpine
-    container_name: self_publishing_db
+    container_name: galley_db
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: self_publishing
+      POSTGRES_DB: galley
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d self_publishing"]
+      test: ["CMD-SHELL", "pg_isready -U postgres -d galley"]
       interval: 5s
       timeout: 5s
       retries: 5

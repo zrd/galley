@@ -17,7 +17,7 @@ db-up:
 	sudo docker compose up -d postgres
 	@echo "Waiting for PostgreSQL to be ready..."
 	@sleep 2
-	@sudo docker compose exec postgres pg_isready -U postgres -d self_publishing || (echo "Database not ready" && exit 1)
+	@sudo docker compose exec postgres pg_isready -U postgres -d galley || (echo "Database not ready" && exit 1)
 	@echo "PostgreSQL is ready!"
 
 # Stop PostgreSQL container
