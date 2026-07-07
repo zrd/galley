@@ -65,7 +65,8 @@ class TestConversionServiceSizeCheck:
 
 
 class TestConversionServiceStderr:
-    def test_logs_stderr_on_success(self, capsys):
+    def test_logs_stderr_on_success(self, caplog):
+        import logging
         service = ConversionService()
         warning = b"[WARNING] some pandoc warning"
         valid_output = b"x" * ConversionService.MIN_OUTPUT_BYTES
@@ -74,16 +75,16 @@ class TestConversionServiceStderr:
         mock_process.returncode = 0
         mock_process.communicate = AsyncMock(return_value=(b"", warning))
 
-        with patch("asyncio.create_subprocess_exec", return_value=mock_process):
-            with patch.object(Path, "exists", return_value=True):
-                with patch.object(Path, "read_bytes", return_value=valid_output):
-                    run(service.convert(b"data", SourceFormat.ODT, OutputFormat.EPUB))
+        with caplog.at_level(logging.WARNING):
+            with patch("asyncio.create_subprocess_exec", return_value=mock_process):
+                with patch.object(Path, "exists", return_value=True):
+                    with patch.object(Path, "read_bytes", return_value=valid_output):
+                        run(service.convert(b"data", SourceFormat.ODT, OutputFormat.EPUB))
 
-        captured = capsys.readouterr()
-        assert "pandoc warning" in captured.err
-        assert "some pandoc warning" in captured.err
+        assert "some pandoc warning" in caplog.text
 
-    def test_no_stderr_output_when_clean(self, capsys):
+    def test_no_stderr_output_when_clean(self, caplog):
+        import logging
         service = ConversionService()
         valid_output = b"x" * ConversionService.MIN_OUTPUT_BYTES
 
@@ -91,13 +92,13 @@ class TestConversionServiceStderr:
         mock_process.returncode = 0
         mock_process.communicate = AsyncMock(return_value=(b"", b""))
 
-        with patch("asyncio.create_subprocess_exec", return_value=mock_process):
-            with patch.object(Path, "exists", return_value=True):
-                with patch.object(Path, "read_bytes", return_value=valid_output):
-                    run(service.convert(b"data", SourceFormat.ODT, OutputFormat.EPUB))
+        with caplog.at_level(logging.WARNING):
+            with patch("asyncio.create_subprocess_exec", return_value=mock_process):
+                with patch.object(Path, "exists", return_value=True):
+                    with patch.object(Path, "read_bytes", return_value=valid_output):
+                        run(service.convert(b"data", SourceFormat.ODT, OutputFormat.EPUB))
 
-        captured = capsys.readouterr()
-        assert captured.err == ""
+        assert caplog.text == ""
 
     def test_raises_on_nonzero_returncode(self):
         service = ConversionService()

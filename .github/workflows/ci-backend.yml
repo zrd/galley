@@ -38,6 +38,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Install system dependencies
+        run: sudo apt-get install -y pandoc
+
       - uses: astral-sh/setup-uv@v5
         with:
           enable-caching: true
