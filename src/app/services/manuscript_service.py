@@ -1,8 +1,11 @@
+import logging
 from uuid import UUID
 
 from app.domain import Manuscript, ManuscriptNotFound, SourceFormat
 from app.repositories import EbookRepository, ManuscriptRepository, SampleRepository, TagRepository
 from app.storage import generate_file_key, get_content_type_for_format, get_storage_backend, validate_image
+
+logger = logging.getLogger(__name__)
 
 
 class ManuscriptService:
@@ -99,7 +102,7 @@ class ManuscriptService:
         try:
             await storage.delete(old_source_key)
         except Exception as e:
-            print(f"This is where I'd put my WARN: {e}\nlog, if I had one")
+            logger.warning(f"Failed to delete old source file {old_source_key}: {e}")
 
         return updated
 
@@ -185,7 +188,7 @@ class ManuscriptService:
             try:
                 await storage.delete(existing_cover)
             except Exception as e:
-                print(f"This is where I'd put my WARN: {e}\nlog, if I had one")
+                logger.warning(f"Failed to delete old cover {existing_cover}: {e}")
 
         return updated
 
@@ -197,6 +200,6 @@ class ManuscriptService:
             try:
                 await storage.delete(existing_cover)
             except Exception as e:
-                print(f"This is where I'd put my WARN: {e}\nlog, if I had one")
+                logger.warning(f"Failed to delete cover {existing_cover}: {e}")
         manuscript.remove_cover()
         return self.repo.update(manuscript)

@@ -9,12 +9,14 @@ Provides format conversion between supported document formats:
 """
 
 import asyncio
-import sys
+import logging
 import tempfile
 
 from pathlib import Path
 
 from app.domain import OutputFormat, SourceFormat
+
+logger = logging.getLogger(__name__)
 
 
 class ConversionError(Exception):
@@ -127,7 +129,7 @@ class ConversionService:
                     error_msg = stderr.decode("utf-8", errors="replace")
                     raise ConversionError(f"Pandoc conversion failed: {error_msg}")
                 if stderr:
-                    print(f"[pandoc warning] {stderr.decode('utf-8', errors='replace')}", file=sys.stderr)
+                    logger.warning(f"pandoc: {stderr.decode('utf-8', errors='replace').strip()}")
 
             except FileNotFoundError:
                 raise ConversionError(
