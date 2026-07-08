@@ -13,9 +13,10 @@ export function Login() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const sessionExpired = !!sessionStorage.getItem('login_redirect');
+  const params = new URLSearchParams(location.search);
+  const sessionExpired = params.get('expired') === '1';
   const from =
-    sessionStorage.getItem('login_redirect') ||
+    params.get('returnTo') ||
     (location.state as { from?: { pathname: string } })?.from?.pathname ||
     '/dashboard';
 
@@ -26,7 +27,6 @@ export function Login() {
 
     try {
       await login({ email, password });
-      sessionStorage.removeItem('login_redirect');
       navigate(from, { replace: true });
     } catch (err) {
       if (err instanceof ApiError) {

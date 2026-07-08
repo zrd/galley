@@ -45,9 +45,19 @@ function VisibilityCell({ ebook }: { ebook: EbookListItem }) {
   const publish = usePublishEbook();
   const unlist = useUnlistEbook();
   const makePrivate = useMakePrivateEbook();
+  const [copied, setCopied] = useState(false);
   const cfg = visibilityConfig[ebook.visibility];
   const isPending = publish.isPending || unlist.isPending || makePrivate.isPending;
   const error = publish.error || unlist.error || makePrivate.error;
+
+  const unlistedUrl = `${window.location.origin}/store/editions/${ebook.id}`;
+
+  const copyLink = () => {
+    navigator.clipboard.writeText(unlistedUrl).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  };
 
   return (
     <div className="space-y-2">
@@ -84,6 +94,22 @@ function VisibilityCell({ ebook }: { ebook: EbookListItem }) {
           </button>
         )}
       </div>
+      {(ebook.visibility === 'published' || ebook.visibility === 'unlisted') && (
+        <div className="flex items-center gap-2">
+          <Link
+            to={`/store/editions/${ebook.id}`}
+            className="text-xs text-blue-600 hover:underline"
+          >
+            View in Store
+          </Link>
+          <button
+            onClick={copyLink}
+            className="shrink-0 rounded border border-gray-300 bg-white px-1.5 py-0.5 text-xs text-gray-600 hover:bg-gray-50"
+          >
+            {copied ? 'Copied!' : 'Copy Link'}
+          </button>
+        </div>
+      )}
       {error && <p className="text-xs text-red-600">Action failed.</p>}
     </div>
   );

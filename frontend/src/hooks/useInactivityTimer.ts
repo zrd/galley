@@ -14,8 +14,8 @@ export function useInactivityTimer() {
       timer = setTimeout(() => {
         if (!localStorage.getItem('access_token')) return;
         localStorage.removeItem('access_token');
-        sessionStorage.setItem('login_redirect', window.location.pathname + window.location.search);
-        window.location.href = '/login';
+        const returnTo = encodeURIComponent(window.location.pathname + window.location.search);
+        window.location.href = `/login?expired=1&returnTo=${returnTo}`;
       }, TIMEOUT_MS);
     };
 

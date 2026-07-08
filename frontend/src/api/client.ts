@@ -22,10 +22,29 @@ function getAuthHeaders(): Record<string, string> {
 async function handleResponse<T>(response: Response): Promise<T> {
   if (!response.ok) {
     if (response.status === 401) {
-      localStorage.removeItem('access_token');
-      sessionStorage.setItem('login_redirect', window.location.pathname + window.location.search);
-      window.location.href = '/login';
-      return new Promise(() => {});
+      const isAuthEndpoint = response.url.includes('/auth/');
+      if (!isAuthEndpoint) {
+        const refreshToken = localStorage.getItem('refresh_token');
+        if (refreshToken) {
+          const refreshed = await fetch(`${API_BASE_URL}/auth/refresh`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ refresh_token: refreshToken }),
+          });
+          if (refreshed.ok) {
+            const tokens = await refreshed.json();
+            localStorage.setItem('access_token', tokens.access_token);
+            localStorage.setItem('refresh_token', tokens.refresh_token);
+            window.location.reload();
+            return new Promise(() => {});
+          }
+        }
+        localStorage.removeItem('access_token');
+        localStorage.removeItem('refresh_token');
+        const returnTo = encodeURIComponent(window.location.pathname + window.location.search);
+        window.location.href = `/login?expired=1&returnTo=${returnTo}`;
+        return new Promise(() => {});
+      }
     }
     const data = await response.json().catch(() => ({}));
     throw new ApiError(response.status, response.statusText, data);
