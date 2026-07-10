@@ -1,15 +1,15 @@
 from uuid import UUID
 
 from app.domain import (
+    AuthorizationError,
     Ebook,
     EbookNotFound,
     ManuscriptInDraft,
     ManuscriptNotFound,
     ManuscriptState,
     OutputFormat,
-    Visibility,
-    AuthorizationError,
     UnlistedDownloadLimitExceeded,
+    Visibility,
 )
 from app.repositories import EbookRepository, ManuscriptRepository
 from app.schemas.ebook import EbookUpdate
