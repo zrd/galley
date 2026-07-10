@@ -50,6 +50,7 @@ export function useUpdateEbookPrice() {
       id: string;
       list_price_cents?: number | null;
       sale_price_cents?: number | null;
+      unlisted_download_limit?: number | null;
     }) => ebooksApi.updatePrice(id, update),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['ebooks'] });

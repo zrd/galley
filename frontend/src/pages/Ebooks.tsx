@@ -110,7 +110,94 @@ function VisibilityCell({ ebook }: { ebook: EbookListItem }) {
           </button>
         </div>
       )}
+      {ebook.visibility === 'unlisted' && <DownloadLimitEditor ebook={ebook} />}
       {error && <p className="text-xs text-red-600">Action failed.</p>}
+    </div>
+  );
+}
+
+function DownloadLimitEditor({ ebook }: { ebook: EbookListItem }) {
+  const [editing, setEditing] = useState(false);
+  const [input, setInput] = useState('');
+  const [validationError, setValidationError] = useState<string | null>(null);
+  const updateLimit = useUpdateEbookPrice();
+
+  function openEdit() {
+    setInput(ebook.unlisted_download_limit === null ? '' : String(ebook.unlisted_download_limit));
+    setValidationError(null);
+    setEditing(true);
+  }
+
+  function cancel() {
+    setEditing(false);
+    setValidationError(null);
+    updateLimit.reset();
+  }
+
+  async function save() {
+    setValidationError(null);
+    const trimmed = input.trim();
+    let limit: number | null = null;
+    if (trimmed) {
+      const parsed = parseInt(trimmed, 10);
+      if (isNaN(parsed) || parsed < 1) {
+        setValidationError('Must be at least 1, or blank for unlimited.');
+        return;
+      }
+      limit = parsed;
+    }
+
+    try {
+      await updateLimit.mutateAsync({ id: ebook.id, unlisted_download_limit: limit });
+      setEditing(false);
+    } catch {
+      // error shown below
+    }
+  }
+
+  if (!editing) {
+    return (
+      <div className="flex items-center gap-1.5 text-xs text-gray-600">
+        <span>
+          {ebook.unlisted_download_limit === null
+            ? 'Unlimited downloads'
+            : `${ebook.download_count} / ${ebook.unlisted_download_limit} downloads used`}
+        </span>
+        <button onClick={openEdit} className="text-blue-600 hover:underline">
+          Edit
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-wrap items-center gap-1.5 text-xs">
+      <span className="text-gray-600">Limit</span>
+      <input
+        type="number"
+        min="1"
+        step="1"
+        placeholder="Unlimited"
+        value={input}
+        onChange={(e) => setInput(e.target.value)}
+        className="w-16 rounded border border-gray-300 px-1.5 py-0.5 text-xs focus:border-blue-500 focus:outline-none"
+      />
+      <button
+        onClick={save}
+        disabled={updateLimit.isPending}
+        className="rounded bg-blue-600 px-1.5 py-0.5 text-xs text-white hover:bg-blue-700 disabled:opacity-50"
+      >
+        {updateLimit.isPending ? 'Saving…' : 'Save'}
+      </button>
+      <button
+        onClick={cancel}
+        className="rounded border border-gray-300 px-1.5 py-0.5 text-xs text-gray-600 hover:bg-gray-50"
+      >
+        Cancel
+      </button>
+      {(validationError || updateLimit.error) && (
+        <span className="w-full text-red-600">{validationError ?? 'Save failed.'}</span>
+      )}
     </div>
   );
 }
