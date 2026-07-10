@@ -13,7 +13,15 @@ from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
 from app.db import get_db
-from app.domain import Download, Ebook, EbookNotFound, ManuscriptInDraft, ManuscriptNotFound
+from app.domain import (
+    Download,
+    Ebook,
+    EbookNotFound,
+    ManuscriptInDraft,
+    ManuscriptNotFound,
+    AuthorizationError,
+    UnlistedDownloadLimitExceeded,
+)
 from app.repositories import (
     AuthorRepository,
     DownloadRepository,
@@ -23,7 +31,7 @@ from app.repositories import (
 )
 from app.schemas import EbookGenerateRequest, EbookListItem, EbookRead
 from app.schemas.ebook import EbookUpdate
-from app.security.auth import CurrentAuthorId
+from app.security.auth import CurrentAuthorId, OptionalAuthorId
 from app.services import (
     AuthorService,
     EbookService,
@@ -102,6 +110,7 @@ def get_ebook(
 async def download_ebook(
     ebook_id: UUID,
     request: Request,
+    author_id: OptionalAuthorId,
     ebook_service: Annotated[EbookService, Depends(get_ebook_service)],
     download_repo: Annotated[DownloadRepository, Depends(get_download_repo)],
     tracking_code: Annotated[str | None, Query(alias="t")] = None,
@@ -116,13 +125,17 @@ async def download_ebook(
     - t: Optional tracking code for QR/link attribution
     """
     try:
-        ebook = ebook_service.get_public_download(ebook_id)
+        ebook = ebook_service.get_for_download(ebook_id, author_id)
     except EbookNotFound:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ebook not found")
     except ManuscriptNotFound:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Manuscript not found")
     except ManuscriptInDraft:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Temporarily unavailable")
+    except AuthorizationError:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Private edition")
+    except UnlistedDownloadLimitExceeded:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Download limit exceeded")
 
     storage = get_storage_backend()
     try:

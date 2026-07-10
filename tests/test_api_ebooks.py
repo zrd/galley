@@ -314,6 +314,7 @@ class TestDownloadEbook:
             json={"output_formats": ["epub"]},
         )
         ebook_id = generate_response.json()[0]["id"]
+        client.post(f"/ebooks/{ebook_id}/publish", headers=auth_headers)
 
         # Download ebook (no auth required)
         response = client.get(f"/ebooks/{ebook_id}/download")
@@ -335,6 +336,7 @@ class TestDownloadEbook:
         )
         ebook_id = generate_response.json()[0]["id"]
         assert generate_response.json()[0]["download_count"] == 0
+        client.post(f"/ebooks/{ebook_id}/publish", headers=auth_headers)
 
         # Download twice
         client.get(f"/ebooks/{ebook_id}/download")
@@ -355,6 +357,7 @@ class TestDownloadEbook:
             json={"output_formats": ["epub"]},
         )
         ebook_id = generate_response.json()[0]["id"]
+        client.post(f"/ebooks/{ebook_id}/publish", headers=auth_headers)
 
         # Download with tracking code
         response = client.get(f"/ebooks/{ebook_id}/download?t=campaign123")
@@ -376,6 +379,7 @@ class TestDownloadEbook:
             json={"output_formats": ["epub"]},
         )
         ebook_id = generate_response.json()[0]["id"]
+        client.post(f"/ebooks/{ebook_id}/publish", headers=auth_headers)
 
         # Delete every file in storage so the ebook file is missing
         for f in test_storage.base_path.rglob("*"):
@@ -549,6 +553,7 @@ class TestEbookSoftDelete:
             json={"output_formats": ["epub"]},
         )
         ebook_id = generate_response.json()[0]["id"]
+        client.post(f"/ebooks/{ebook_id}/publish", headers=auth_headers)
 
         # Delete it
         client.delete(f"/ebooks/{ebook_id}", headers=auth_headers)
@@ -934,6 +939,7 @@ class TestDraftDownloadGate:
         self, client: TestClient, auth_headers: dict, manuscript_with_ebook: tuple[str, str]
     ):
         manuscript_id, ebook_id = manuscript_with_ebook
+        client.post(f"/ebooks/{ebook_id}/publish", headers=auth_headers)
 
         # READY — gate is open
         assert client.get(f"/ebooks/{ebook_id}/download").status_code != 403
@@ -945,3 +951,60 @@ class TestDraftDownloadGate:
         # Mark READY again — gate reopens
         client.post(f"/manuscripts/{manuscript_id}/ready", headers=auth_headers)
         assert client.get(f"/ebooks/{ebook_id}/download").status_code != 403
+
+
+class TestDownloadVisibilityAPI:
+    """Thin end-to-end checks for the download endpoint's visibility gate.
+
+    Most of the gating logic (visibility branching, limit comparison, draft
+    ordering) is covered directly against EbookService in TestGetForDownload
+    (test_services.py). These only verify what requires real HTTP: exception
+    to status-code mapping, bearer-token wiring via OptionalAuthorId, and the
+    endpoint's own increment-after-gate control flow.
+    """
+
+    @pytest.fixture
+    def ebook_id(
+        self, client: TestClient, auth_headers: dict, ready_manuscript_id: str
+    ) -> str:
+        response = client.post(
+            f"/ebooks/manuscripts/{ready_manuscript_id}/generate",
+            headers=auth_headers,
+            json={"output_formats": ["epub"]},
+        )
+        return response.json()[0]["id"]
+
+    def test_private_download_unauthenticated_returns_403(
+        self, client: TestClient, ebook_id: str
+    ):
+        response = client.get(f"/ebooks/{ebook_id}/download")
+        assert response.status_code == 403
+
+    def test_unlisted_download_limit_exceeded_returns_403(
+        self, client: TestClient, auth_headers: dict, ebook_id: str
+    ):
+        client.post(f"/ebooks/{ebook_id}/unlist", headers=auth_headers)
+        client.patch(
+            f"/ebooks/{ebook_id}", headers=auth_headers,
+            json={"unlisted_download_limit": 1},
+        )
+        client.get(f"/ebooks/{ebook_id}/download")  # consumes the one allowed download
+
+        response = client.get(f"/ebooks/{ebook_id}/download")
+
+        assert response.status_code == 403
+
+    def test_private_download_owner_succeeds(
+        self, client: TestClient, auth_headers: dict, ebook_id: str
+    ):
+        response = client.get(f"/ebooks/{ebook_id}/download", headers=auth_headers)
+        assert response.status_code == 200
+
+    def test_rejected_download_does_not_increment_count(
+        self, client: TestClient, auth_headers: dict, ebook_id: str
+    ):
+        client.get(f"/ebooks/{ebook_id}/download")  # unauthenticated, private -> 403
+
+        get_response = client.get(f"/ebooks/{ebook_id}", headers=auth_headers)
+
+        assert get_response.json()["download_count"] == 0

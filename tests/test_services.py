@@ -9,14 +9,18 @@ import pytest
 from sqlalchemy.orm import Session
 
 from app.domain import (
+    AuthorizationError,
     AuthorNotFound,
     Manuscript,
+    ManuscriptInDraft,
     ManuscriptNotFound,
     ManuscriptState,
     OutputFormat,
     SampleNotFound,
     SourceFormat,
     TagNotFound,
+    UnlistedDownloadLimitExceeded,
+    Visibility,
 )
 from app.repositories import (
     AuthorRepository,
@@ -639,6 +643,154 @@ class TestEbookService:
         retrieved = service.get(ebook.id)
         assert retrieved.list_price_cents == 999
         assert retrieved.sale_price_cents == 799
+
+
+class TestGetForDownload:
+    @pytest.fixture
+    def service(self, db_session: Session) -> EbookService:
+        repo = EbookRepository(db_session)
+        manuscript_repo = ManuscriptRepository(db_session)
+        return EbookService(repo, manuscript_repo)
+
+    @pytest.fixture
+    def owner_id(self, db_session: Session):
+        author_repo = AuthorRepository(db_session)
+        author = AuthorService(author_repo).create(
+            email="download-owner@example.com",
+            password_hash="hash",
+            display_name="Owner",
+        )
+        db_session.commit()
+        return author.id
+
+    @pytest.fixture
+    def stranger_id(self, db_session: Session):
+        author_repo = AuthorRepository(db_session)
+        author = AuthorService(author_repo).create(
+            email="download-stranger@example.com",
+            password_hash="hash",
+            display_name="Stranger",
+        )
+        db_session.commit()
+        return author.id
+
+    @pytest.fixture
+    def manuscript_id(self, db_session: Session, owner_id):
+        manuscript_repo = ManuscriptRepository(db_session)
+        manuscript = _make_manuscript(manuscript_repo, owner_id, title="Download Test Book")
+        db_session.commit()
+
+        manuscript_service = ManuscriptService(
+            manuscript_repo, SampleRepository(db_session), EbookRepository(db_session)
+        )
+        manuscript_service.mark_ready(manuscript.id)
+        db_session.commit()
+        return manuscript.id
+
+    def _make_ebook(self, service: EbookService, db_session: Session, manuscript_id):
+        ebook = service.create(
+            manuscript_id=manuscript_id,
+            output_format=OutputFormat.EPUB,
+            file_key=f"ebooks/{uuid4()}.epub",
+            file_size_bytes=2048,
+            download_filename="Download Test.epub",
+        )
+        db_session.commit()
+        return ebook
+
+    def test_private_download_unauthenticated_raises(
+        self, service: EbookService, db_session: Session, manuscript_id
+    ):
+        ebook = self._make_ebook(service, db_session, manuscript_id)
+
+        with pytest.raises(AuthorizationError):
+            service.get_for_download(ebook.id, requester_id=None)
+
+    def test_private_download_non_owner_raises(
+        self, service: EbookService, db_session: Session, manuscript_id, stranger_id
+    ):
+        ebook = self._make_ebook(service, db_session, manuscript_id)
+
+        with pytest.raises(AuthorizationError):
+            service.get_for_download(ebook.id, requester_id=stranger_id)
+
+    def test_private_download_owner_succeeds(
+        self, service: EbookService, db_session: Session, manuscript_id, owner_id
+    ):
+        ebook = self._make_ebook(service, db_session, manuscript_id)
+
+        result = service.get_for_download(ebook.id, requester_id=owner_id)
+
+        assert result.id == ebook.id
+
+    def test_unlisted_no_limit_downloadable(
+        self, service: EbookService, db_session: Session, manuscript_id
+    ):
+        ebook = self._make_ebook(service, db_session, manuscript_id)
+        ebook = service.unlist(ebook.id)
+        db_session.commit()
+
+        result = service.get_for_download(ebook.id, requester_id=None)
+
+        assert result.id == ebook.id
+
+    def test_unlisted_under_limit_downloadable(
+        self, service: EbookService, db_session: Session, manuscript_id
+    ):
+        ebook = self._make_ebook(service, db_session, manuscript_id)
+        ebook = service.unlist(ebook.id)
+        ebook = service.update_price(
+            ebook=ebook, update_in=EbookUpdate(unlisted_download_limit=2)
+        )
+        db_session.commit()
+        service.increment_download(ebook.id)
+        db_session.commit()
+
+        result = service.get_for_download(ebook.id, requester_id=None)
+
+        assert result.id == ebook.id
+
+    def test_unlisted_at_limit_raises(
+        self, service: EbookService, db_session: Session, manuscript_id
+    ):
+        ebook = self._make_ebook(service, db_session, manuscript_id)
+        ebook = service.unlist(ebook.id)
+        ebook = service.update_price(
+            ebook=ebook, update_in=EbookUpdate(unlisted_download_limit=1)
+        )
+        db_session.commit()
+        service.increment_download(ebook.id)
+        db_session.commit()
+
+        with pytest.raises(UnlistedDownloadLimitExceeded):
+            service.get_for_download(ebook.id, requester_id=None)
+
+    def test_published_downloadable_without_auth(
+        self, service: EbookService, db_session: Session, manuscript_id
+    ):
+        ebook = self._make_ebook(service, db_session, manuscript_id)
+        ebook = service.publish(ebook.id)
+        db_session.commit()
+
+        result = service.get_for_download(ebook.id, requester_id=None)
+
+        assert result.id == ebook.id
+
+    def test_draft_manuscript_gates_before_visibility(
+        self, service: EbookService, db_session: Session, manuscript_id, owner_id
+    ):
+        """Draft gate fires even for the owning author — it's checked before visibility."""
+        ebook = self._make_ebook(service, db_session, manuscript_id)
+
+        manuscript_repo = ManuscriptRepository(db_session)
+        manuscript_service = ManuscriptService(
+            manuscript_repo, SampleRepository(db_session), EbookRepository(db_session)
+        )
+        manuscript_service.mark_draft(manuscript_id)
+        db_session.commit()
+
+        with pytest.raises(ManuscriptInDraft):
+            service.get_for_download(ebook.id, requester_id=owner_id)
 
 
 class TestTagRepository:
