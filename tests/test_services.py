@@ -20,7 +20,6 @@ from app.domain import (
     SourceFormat,
     TagNotFound,
     UnlistedDownloadLimitExceeded,
-    Visibility,
 )
 from app.repositories import (
     AuthorRepository,
