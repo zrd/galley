@@ -29,7 +29,11 @@ export const ebooksApi = {
 
   async updatePrice(
     id: string,
-    update: { list_price_cents?: number | null; sale_price_cents?: number | null },
+    update: {
+      list_price_cents?: number | null;
+      sale_price_cents?: number | null;
+      unlisted_download_limit?: number | null;
+    },
   ): Promise<Ebook> {
     return apiClient.patch<Ebook>(`/ebooks/${id}`, update);
   },
