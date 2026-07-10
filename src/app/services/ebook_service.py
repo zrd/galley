@@ -7,6 +7,9 @@ from app.domain import (
     ManuscriptNotFound,
     ManuscriptState,
     OutputFormat,
+    Visibility,
+    AuthorizationError,
+    UnlistedDownloadLimitExceeded,
 )
 from app.repositories import EbookRepository, ManuscriptRepository
 from app.schemas.ebook import EbookUpdate
@@ -42,7 +45,7 @@ class EbookService:
             raise EbookNotFound(f"Ebook {ebook_id} not found")
         return ebook
 
-    def get_public_download(self, ebook_id: UUID) -> Ebook:
+    def get_for_download(self, ebook_id: UUID, requester_id: UUID | None = None) -> Ebook:
         ebook = self.repo.get(ebook_id, include_deleted=False)
         if ebook is None:
             raise EbookNotFound(f"Ebook {ebook_id} not found")
@@ -53,6 +56,14 @@ class EbookService:
 
         if manuscript.state == ManuscriptState.DRAFT:
             raise ManuscriptInDraft(f"Manuscript {manuscript.id} in draft state")
+
+        if ebook.visibility == Visibility.PRIVATE:
+            if requester_id is None or requester_id != manuscript.author_id:
+                raise AuthorizationError(f"Ebook {ebook_id} is private")
+
+        if ebook.visibility == Visibility.UNLISTED:
+            if ebook.unlisted_download_limit is not None and ebook.download_count >= ebook.unlisted_download_limit:
+                raise UnlistedDownloadLimitExceeded("Download limit reached")
 
         return ebook
 
@@ -94,6 +105,9 @@ class EbookService:
 
         if "price_currency" in update_in.model_fields_set:
             ebook.price_currency = update_in.price_currency
+
+        if "unlisted_download_limit" in update_in.model_fields_set:
+            ebook.unlisted_download_limit = update_in.unlisted_download_limit
 
         return self.repo.update(ebook)
 

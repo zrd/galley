@@ -14,8 +14,18 @@ def _is_valid_price(price: int | None) -> int | None:
 
     if 0 <= price <= 99999:
         return price
-    else:
-        raise ValueError(f"Invalid price: {price}")
+
+    raise ValueError(f"Invalid price: {price}")
+
+
+def _is_valid_download_limit(limit: int | None) -> int | None:
+    if limit is None:
+        return None
+
+    if limit >= 1:
+        return limit
+
+    raise ValueError(f"Invalid download limit: {limit}")
 
 
 class EbookGenerateRequest(BaseModel):
@@ -64,4 +74,5 @@ class EbookListItem(BaseModel):
 class EbookUpdate(BaseModel):
     list_price_cents: Annotated[int | None, AfterValidator(_is_valid_price)] = None
     sale_price_cents: Annotated[int | None, AfterValidator(_is_valid_price)] = None
+    unlisted_download_limit: Annotated[int | None, AfterValidator(_is_valid_download_limit)] = None
     price_currency: str = "USD"
