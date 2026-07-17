@@ -7,7 +7,12 @@ from pathlib import Path
 
 import pytest
 
-from app.storage import LocalStorageBackend, generate_file_key, get_content_type_for_format
+from app.storage import (
+    LocalStorageBackend,
+    UnsafeStorageKey,
+    generate_file_key,
+    get_content_type_for_format,
+)
 
 
 class TestLocalStorageBackend:
@@ -106,6 +111,40 @@ class TestLocalStorageBackend:
             content_type = await backend.get_content_type("test.epub")
             assert content_type == "application/epub+zip"
 
+    @pytest.mark.asyncio
+    async def test_dotdot_traversal_raises_unsafe_storage_key(self, storage: LocalStorageBackend):
+        with pytest.raises(UnsafeStorageKey):
+            await storage.download("../../etc/passwd")
+
+    @pytest.mark.asyncio
+    async def test_bare_dotdot_with_no_separator_raises(self, storage: LocalStorageBackend):
+        """A whole key of '..' escapes even with zero separator characters —
+        pathlib treats a full string as one path component."""
+        with pytest.raises(UnsafeStorageKey):
+            await storage.download("..")
+
+    @pytest.mark.asyncio
+    async def test_absolute_path_key_raises(self, storage: LocalStorageBackend):
+        """Joining with an absolute-path key silently discards the base in
+        pathlib — must still be caught by the post-resolve containment check."""
+        with pytest.raises(UnsafeStorageKey):
+            await storage.download("/etc/passwd")
+
+    @pytest.mark.asyncio
+    async def test_symlink_escape_raises(self, storage: LocalStorageBackend):
+        with tempfile.TemporaryDirectory() as outside_dir:
+            outside = Path(outside_dir)
+            (outside / "secret.txt").write_text("top secret")
+            symlink_path = storage.base_path / "evil_link"
+            symlink_path.symlink_to(outside)
+
+            with pytest.raises(UnsafeStorageKey):
+                await storage.download("evil_link/secret.txt")
+
+    def test_unsafe_storage_key_is_a_value_error(self):
+        """Existing `except ValueError` catches (e.g. update_cover) must keep working."""
+        assert issubclass(UnsafeStorageKey, ValueError)
+
 
 class TestFileKeyGeneration:
     def test_generate_file_key_format(self):
@@ -139,6 +178,36 @@ class TestFileKeyGeneration:
 
         # Keys should be unique even for same input
         assert key1 != key2
+
+    def test_reject_unsafe_raises_on_slash(self):
+        from uuid import uuid4
+
+        with pytest.raises(UnsafeStorageKey):
+            generate_file_key(uuid4(), "../../evil.epub", "manuscripts", reject_unsafe=True)
+
+    def test_reject_unsafe_raises_on_backslash(self):
+        from uuid import uuid4
+
+        with pytest.raises(UnsafeStorageKey):
+            generate_file_key(uuid4(), "evil\\..\\..\\file.epub", "manuscripts", reject_unsafe=True)
+
+    def test_reject_unsafe_still_sanitizes_non_separator_chars(self):
+        """reject_unsafe only targets separators — other special characters
+        are still silently stripped, not rejected."""
+        from uuid import uuid4
+
+        key = generate_file_key(uuid4(), "my book (1).epub", "manuscripts", reject_unsafe=True)
+        assert " " not in key
+        assert "(" not in key
+
+    def test_default_does_not_reject_slash(self):
+        """reject_unsafe defaults to False: a title-derived filename with a
+        '/' is sanitized, not rejected — this is what keeps ebook/sample
+        generation from breaking on an ordinary manuscript title."""
+        from uuid import uuid4
+
+        key = generate_file_key(uuid4(), "Choose Your Path: A/B Testing.epub", "ebooks")
+        assert "/" not in key.split("/", 2)[-1]
 
 
 class TestContentTypeMapping:

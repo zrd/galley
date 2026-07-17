@@ -10,6 +10,8 @@ from pathlib import Path
 import aiofiles
 import aiofiles.os
 
+from .protocol import UnsafeStorageKey
+
 
 class LocalStorageBackend:
     """Local filesystem storage backend."""
@@ -21,14 +23,19 @@ class LocalStorageBackend:
         Args:
             base_path: The base directory for storing files
         """
-        self.base_path = Path(base_path)
-        self.base_path.mkdir(parents=True, exist_ok=True)
+        base_path = Path(base_path)
+        base_path.mkdir(parents=True, exist_ok=True)
+        self.base_path = base_path.resolve()
 
     def _get_full_path(self, key: str) -> Path:
         """Get the full filesystem path for a storage key."""
         # Normalize the key to prevent directory traversal
-        safe_key = key.lstrip("/").replace("..", "")
-        return self.base_path / safe_key
+        trial_key = (self.base_path / key).resolve()
+        try:
+            _ = trial_key.relative_to(self.base_path)
+            return trial_key
+        except ValueError:
+            raise UnsafeStorageKey(key)
 
     async def upload(
         self, key: str, data: bytes, content_type: str = "application/octet-stream"

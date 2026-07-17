@@ -3,9 +3,13 @@ Integration tests for ebook API endpoints.
 """
 
 import io
+from uuid import UUID
 
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy.orm import Session
+
+from app.db.models import EbookModel
 
 
 @pytest.fixture
@@ -286,6 +290,42 @@ class TestGenerateEbooks:
         assert ebook["sale_price_cents"] is None
         assert ebook["price_currency"] == "USD"
 
+    def test_generate_succeeds_for_title_containing_path_separator(
+        self, client: TestClient, auth_headers: dict, sample_epub: bytes
+    ):
+        """Manuscript titles are historical metadata, not live upload input —
+        a '/' in a title must be silently sanitized out of the derived
+        storage key, never rejected (see BUG-009's reject_unsafe design)."""
+        response = client.post(
+            "/manuscripts/",
+            headers=auth_headers,
+            data={"title": "Choose Your Path: A/B Testing", "source_format": "epub"},
+            files={"file": ("book.epub", io.BytesIO(sample_epub), "application/epub+zip")},
+        )
+        manuscript_id = response.json()["id"]
+        client.post(f"/manuscripts/{manuscript_id}/ready", headers=auth_headers)
+
+        response = client.post(
+            f"/ebooks/manuscripts/{manuscript_id}/generate",
+            headers=auth_headers,
+            json={"output_formats": ["epub"]},
+        )
+
+        assert response.status_code == 200
+        ebook_id = response.json()[0]["id"]
+
+        # Full round trip: the sanitized storage key must actually be
+        # retrievable, not just accepted at generation time.
+        client.post(f"/ebooks/{ebook_id}/publish", headers=auth_headers)
+        download = client.get(f"/ebooks/{ebook_id}/download")
+
+        assert download.status_code == 200
+        assert len(download.content) > 0
+        # Content-Disposition filename is a separate sanitizer
+        # (_sanitize_download_filename) from the storage key -- confirm it
+        # also stripped the '/' rather than passing it through raw.
+        assert "/" not in download.headers["content-disposition"]
+
 
 class TestDownloadEbook:
     def test_download_nonexistent_ebook(self, client: TestClient):
@@ -385,6 +425,31 @@ class TestDownloadEbook:
         for f in test_storage.base_path.rglob("*"):
             if f.is_file():
                 f.unlink()
+
+        response = client.get(f"/ebooks/{ebook_id}/download")
+        assert response.status_code == 404
+
+    def test_download_unsafe_stored_key_returns_404(
+        self,
+        client: TestClient,
+        auth_headers: dict,
+        ready_manuscript_id: str,
+        db_session: Session,
+    ):
+        """Defense-in-depth: even if a stored key were somehow unsafe (can't
+        happen through generation, which always sanitizes), get_url raising
+        UnsafeStorageKey must map to 404, not an unhandled 500."""
+        generate_response = client.post(
+            f"/ebooks/manuscripts/{ready_manuscript_id}/generate",
+            headers=auth_headers,
+            json={"output_formats": ["epub"]},
+        )
+        ebook_id = generate_response.json()[0]["id"]
+        client.post(f"/ebooks/{ebook_id}/publish", headers=auth_headers)
+
+        ebook = db_session.get(EbookModel, UUID(ebook_id))
+        ebook.file_key = "../../etc/passwd"
+        db_session.commit()
 
         response = client.get(f"/ebooks/{ebook_id}/download")
         assert response.status_code == 404

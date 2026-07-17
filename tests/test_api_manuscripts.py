@@ -5,10 +5,13 @@ Integration tests for manuscript API endpoints.
 import asyncio
 import io
 from pathlib import Path
+from uuid import UUID
 
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy.orm import Session
 
+from app.db.models import ManuscriptModel
 from app.storage import LocalStorageBackend
 
 RESOURCES = Path(__file__).parent / "resources"
@@ -95,6 +98,18 @@ class TestCreateManuscript:
 
             assert response.status_code == 201, f"Failed for format {fmt}"
             assert response.json()["source_format"] == fmt
+
+    def test_create_manuscript_filename_with_path_separator_rejected(
+        self, client: TestClient, auth_headers: dict, sample_epub: bytes
+    ):
+        response = client.post(
+            "/manuscripts/",
+            headers=auth_headers,
+            data={"title": "Traversal Attempt", "source_format": "epub"},
+            files={"file": ("../../evil.epub", io.BytesIO(sample_epub), "application/epub+zip")},
+        )
+
+        assert response.status_code == 400
 
 
 class TestListManuscripts:
@@ -286,6 +301,20 @@ class TestUpdateManuscript:
         assert response.json()["title"] == "New Title"
         # Description should remain unchanged
         assert response.json()["description"] == "Original desc"
+
+
+class TestUpdateManuscriptFile:
+    def test_update_manuscript_file_filename_with_path_separator_rejected(
+        self, client: TestClient, auth_headers: dict, manuscript_id: str, sample_epub: bytes
+    ):
+        response = client.put(
+            f"/manuscripts/{manuscript_id}/file",
+            headers=auth_headers,
+            data={"source_format": "epub"},
+            files={"file": ("../../evil.epub", io.BytesIO(sample_epub), "application/epub+zip")},
+        )
+
+        assert response.status_code == 400
 
 
 class TestMarkReady:
@@ -1158,6 +1187,16 @@ class TestUploadCover:
         detail = response.json()["detail"]
         assert "JPEG" in detail or "PNG" in detail
 
+    def test_upload_cover_filename_with_path_separator_rejected(
+        self, client: TestClient, auth_headers: dict, manuscript_id: str, sample_jpeg: bytes
+    ):
+        response = client.put(
+            f"/manuscripts/{manuscript_id}/cover",
+            headers=auth_headers,
+            files={"file": ("../../evil.jpg", io.BytesIO(sample_jpeg), "image/jpeg")},
+        )
+        assert response.status_code == 400
+
 
 class TestGetCover:
     def test_get_cover_jpeg(
@@ -1245,6 +1284,29 @@ class TestGetCover:
         )
         key = upload.json()["cover_image_key"]
         asyncio.run(test_storage.delete(key))
+
+        response = client.get(f"/manuscripts/{manuscript_id}/cover")
+        assert response.status_code == 404
+
+    def test_get_cover_unsafe_stored_key_returns_404(
+        self,
+        client: TestClient,
+        auth_headers: dict,
+        manuscript_id: str,
+        sample_jpeg: bytes,
+        db_session: Session,
+    ):
+        """Defense-in-depth: even if a stored key were somehow unsafe (can't
+        happen through the upload endpoint, which always sanitizes), get_url
+        raising UnsafeStorageKey must map to 404, not an unhandled 500."""
+        client.put(
+            f"/manuscripts/{manuscript_id}/cover",
+            headers=auth_headers,
+            files={"file": ("cover.jpg", io.BytesIO(sample_jpeg), "image/jpeg")},
+        )
+        manuscript = db_session.get(ManuscriptModel, UUID(manuscript_id))
+        manuscript.cover_image_key = "../../etc/passwd"
+        db_session.commit()
 
         response = client.get(f"/manuscripts/{manuscript_id}/cover")
         assert response.status_code == 404

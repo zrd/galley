@@ -37,7 +37,7 @@ class ManuscriptService:
         tag_names: list[str] | None = None,
         description: str | None = None,
     ) -> Manuscript:
-        source_file_key = generate_file_key(author_id, filename, "manuscripts")
+        source_file_key = generate_file_key(author_id, filename, "manuscripts", reject_unsafe=True)
         content_type = get_content_type_for_format(source_format.value)
         storage = get_storage_backend()
         await storage.upload(source_file_key, content, content_type)
@@ -98,7 +98,7 @@ class ManuscriptService:
     ) -> Manuscript:
         manuscript = self.get(manuscript_id)
         old_source_key = manuscript.source_file_key
-        file_key = generate_file_key(author_id, filename, "manuscripts")
+        file_key = generate_file_key(author_id, filename, "manuscripts", reject_unsafe=True)
         content_type = get_content_type_for_format(source_format.value)
         storage = get_storage_backend()
         await storage.upload(file_key, content, content_type)
@@ -182,7 +182,7 @@ class ManuscriptService:
                 cover_image_filename = cover_image_filename + f".{format_extension}"
 
         filename = cover_image_filename or f"cover.{format_extension}"
-        file_key = generate_file_key(author_id, filename, "covers")
+        file_key = generate_file_key(author_id, filename, "covers", reject_unsafe=True)
 
         storage = get_storage_backend()
         await storage.upload(file_key, cover_image_content, content_type)
