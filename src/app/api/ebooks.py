@@ -39,7 +39,7 @@ from app.services import (
     GenerationService,
     ManuscriptService,
 )
-from app.storage import get_content_type_for_format, get_storage_backend
+from app.storage import UnsafeStorageKey, get_content_type_for_format, get_storage_backend
 
 router = APIRouter()
 
@@ -140,7 +140,8 @@ async def download_ebook(
     storage = get_storage_backend()
     try:
         asset_path = await storage.get_url(ebook.file_key)
-    except FileNotFoundError:
+    except (FileNotFoundError, UnsafeStorageKey):
+        # Detail message is intentionally underspecified -- avoid leaking exploitable intel on UnsafeStorageKey
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ebook file not found")
 
     media_type = get_content_type_for_format(ebook.output_format.value)

@@ -10,7 +10,7 @@ from functools import lru_cache
 from app.config import settings
 
 from .local import LocalStorageBackend
-from .protocol import StorageBackend
+from .protocol import StorageBackend, UnsafeStorageKey
 
 
 @lru_cache
@@ -38,6 +38,8 @@ def generate_file_key(
     author_id: uuid.UUID,
     filename: str,
     file_type: str = "manuscripts",
+    *,
+    reject_unsafe: bool = False,
 ) -> str:
     """
     Generate a unique storage key for a file.
@@ -48,6 +50,7 @@ def generate_file_key(
         author_id: The author's UUID
         filename: The original filename
         file_type: The type of file (manuscripts, ebooks, etc.)
+        reject_unsafe: Flag to raise UnsafeStorageKey on user-supplied input
 
     Returns:
         A unique storage key
@@ -56,10 +59,10 @@ def generate_file_key(
     unique_hash = hashlib.sha256(
         f"{author_id}{timestamp}{uuid.uuid4()}".encode()
     ).hexdigest()[:12]
+    if reject_unsafe and ("/" in filename or "\\" in filename):
+        raise UnsafeStorageKey(filename)
 
-    # Sanitize filename
     safe_filename = "".join(c for c in filename if c.isalnum() or c in "._-")
-
     return f"{file_type}/{author_id}/{timestamp}_{unique_hash}_{safe_filename}"
 
 

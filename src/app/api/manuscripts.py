@@ -20,7 +20,7 @@ from app.repositories import (
 from app.schemas import ManuscriptListItem, ManuscriptRead, ManuscriptUpdate
 from app.security.auth import CurrentAuthorId
 from app.services import ManuscriptService
-from app.storage import get_content_type_for_format, get_storage_backend
+from app.storage import UnsafeStorageKey, get_content_type_for_format, get_storage_backend
 
 router = APIRouter()
 
@@ -228,7 +228,7 @@ async def get_cover(
         storage = get_storage_backend()
         try:
             asset_path = await storage.get_url(manuscript.cover_image_key)
-        except FileNotFoundError:
+        except (FileNotFoundError, UnsafeStorageKey):
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Cover not found")
 
         media_type = get_content_type_for_format(asset_path.split(".")[-1])

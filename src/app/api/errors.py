@@ -15,6 +15,7 @@ from app.domain import (
     InvalidStateTransition,
 )
 from app.services import ConversionError, GenerationError
+from app.storage import UnsafeStorageKey
 
 
 def register_error_handlers(app: FastAPI) -> None:
@@ -68,4 +69,11 @@ def register_error_handlers(app: FastAPI) -> None:
         return JSONResponse(
             status_code=status.HTTP_400_BAD_REQUEST,
             content={"detail": str(exc)},
+        )
+
+    @app.exception_handler(UnsafeStorageKey)
+    async def unsafe_storage_handler(request: Request, exc: UnsafeStorageKey) -> JSONResponse:
+        return JSONResponse(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            content={"detail": str(exc)}
         )

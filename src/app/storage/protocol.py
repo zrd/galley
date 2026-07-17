@@ -1,6 +1,10 @@
 from typing import Protocol
 
 
+class UnsafeStorageKey(ValueError):
+    """A storage key/filename would escape the storage root."""
+
+
 class StorageBackend(Protocol):
     """Protocol for file storage backends (local filesystem, S3, etc.)."""
 
