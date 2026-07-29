@@ -382,6 +382,39 @@ class TestSampleOwnership:
         assert response.status_code == 404
 
 
+class TestGenerateSampleEbooks:
+    """Sample ebook generation is deliberately disabled -- see the 501 raise
+    in the endpoint. The current implementation would produce the full
+    manuscript rather than a real excerpt (no excerpt extraction exists
+    yet), which is unsafe to ship given ebooks otherwise have a paid
+    pricing model. This locks in the disabled behavior so it can't be
+    silently re-enabled by someone "fixing" the now-correct argument
+    wiring underneath it without addressing that."""
+
+    def test_generate_sample_ebooks_returns_501(
+        self, client: TestClient, auth_headers: dict, manuscript_id: str
+    ):
+        create_response = client.post(
+            f"/samples/manuscripts/{manuscript_id}/samples",
+            headers=auth_headers,
+            json={
+                "title": "Free Preview",
+                "excerpt_start": "Chapter 1",
+                "excerpt_end": "Chapter 3",
+            },
+        )
+        sample_id = create_response.json()["id"]
+
+        response = client.post(
+            f"/samples/{sample_id}/generate",
+            headers=auth_headers,
+            json={"output_formats": ["epub"]},
+        )
+
+        assert response.status_code == 501
+        assert "not yet implemented" in response.json()["detail"].lower()
+
+
 class TestInputValidation:
     """Tests for malformed input handling in sample endpoints."""
 

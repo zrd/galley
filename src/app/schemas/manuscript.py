@@ -68,7 +68,7 @@ class ManuscriptRead(BaseModel):
     created_at: datetime
     updated_at: datetime
 
-    @computed_field
+    @computed_field    # type: ignore[prop-decorator]
     @property
     def cover_image_url(self) -> str | None:
         if self.cover_image_key is None:
@@ -91,7 +91,7 @@ class ManuscriptListItem(BaseModel):
     cover_image_key: str | None = None
     deleted_at: datetime | None = None
 
-    @computed_field
+    @computed_field    # type: ignore[prop-decorator]
     @property
     def cover_image_url(self) -> str | None:
         if self.cover_image_key is None:

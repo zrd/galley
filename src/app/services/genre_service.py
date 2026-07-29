@@ -41,11 +41,17 @@ class GenreService:
 
     def get_tree(self) -> list[GenreTree]:
         genres = self.repo.list_all()
-        nodes = {g.id: GenreTree(id=g.id, name=g.name, slug=g.slug, description=g.description) for g in genres}
+        nodes: dict[int, GenreTree] = {}
+        for g in genres:
+            assert g.id is not None, "genres from list_all() are always persisted"
+            nodes[g.id] = GenreTree(id=g.id, name=g.name, slug=g.slug, description=g.description)
+
         roots = []
         for g in genres:
+            assert g.id is not None, "genres from list_all() are always persisted"
             if g.parent_id is None:
                 roots.append(nodes[g.id])
             else:
                 nodes[g.parent_id].children.append(nodes[g.id])
+
         return roots

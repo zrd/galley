@@ -32,7 +32,7 @@ class StoreAuthorSummary(BaseModel):
     id: UUID
     display_name: str
 
-    @computed_field
+    @computed_field    # type: ignore[prop-decorator]
     @property
     def profile_url(self) -> str:
         return f"/store/authors/{self.id}"
@@ -47,7 +47,7 @@ class StoreAuthorListItem(BaseModel):
     website: str | None
     avatar_key: str | None = Field(exclude=True)
 
-    @computed_field
+    @computed_field    # type: ignore[prop-decorator]
     @property
     def avatar_url(self) -> str | None:
         if self.avatar_key:
@@ -55,7 +55,7 @@ class StoreAuthorListItem(BaseModel):
 
         return None
 
-    @computed_field
+    @computed_field    # type: ignore[prop-decorator]
     @property
     def profile_url(self) -> str:
         return f"/store/authors/{self.id}"
@@ -70,12 +70,12 @@ class StoreEditionSummary(BaseModel):
     list_price_cents: int | None = Field(exclude=True)
     sale_price_cents: int | None = Field(exclude=True)
 
-    @computed_field
+    @computed_field    # type: ignore[prop-decorator]
     @property
     def is_free(self) -> bool:
         return _effective_price_cents(self.list_price_cents, self.sale_price_cents) == 0
 
-    @computed_field
+    @computed_field    # type: ignore[prop-decorator]
     @property
     def formatted_price(self) -> str:
         price = _effective_price_cents(self.list_price_cents, self.sale_price_cents)
@@ -99,7 +99,7 @@ class StoreBrowseItem(BaseModel):
     editions: list[StoreEditionSummary] = Field(validation_alias="ebooks")
     cover_image_key: str | None = Field(exclude=True)
 
-    @computed_field
+    @computed_field    # type: ignore[prop-decorator]
     @property
     def cover_url(self) -> str | None:
         if self.cover_image_key:
@@ -107,7 +107,7 @@ class StoreBrowseItem(BaseModel):
 
         return None
 
-    @computed_field
+    @computed_field    # type: ignore[prop-decorator]
     @property
     def first_published_at(self) -> datetime | None:
         return min((e.published_at for e in self.editions if e.published_at is not None), default=None)
@@ -123,7 +123,7 @@ class StoreAuthorDetail(BaseModel):
     listings: list[StoreBrowseItem] = Field(validation_alias="manuscripts")
     avatar_key: str | None = Field(exclude=True)
 
-    @computed_field
+    @computed_field    # type: ignore[prop-decorator]
     @property
     def avatar_url(self) -> str | None:
         if self.avatar_key:
@@ -131,7 +131,7 @@ class StoreAuthorDetail(BaseModel):
 
         return None
 
-    @computed_field
+    @computed_field    # type: ignore[prop-decorator]
     @property
     def profile_url(self) -> str:
         return f"/store/authors/{self.id}"
@@ -149,7 +149,7 @@ class StoreManuscriptDetail(BaseModel):
     editions: list[StoreEditionSummary] = Field(validation_alias="ebooks")
     cover_image_key: str | None = Field(exclude=True)
 
-    @computed_field
+    @computed_field    # type: ignore[prop-decorator]
     @property
     def cover_url(self) -> str | None:
         if self.cover_image_key:
@@ -157,7 +157,7 @@ class StoreManuscriptDetail(BaseModel):
 
         return None
 
-    @computed_field
+    @computed_field    # type: ignore[prop-decorator]
     @property
     def first_published_at(self) -> datetime | None:
         return min((e.published_at for e in self.editions if e.published_at is not None), default=None)
@@ -176,17 +176,17 @@ class StoreEditionDetail(BaseModel):
     price_currency: str
     direct_download: bool = False
 
-    @computed_field
+    @computed_field    # type: ignore[prop-decorator]
     @property
     def download_url(self) -> str:
         return f"/ebooks/{self.id}/download"
 
-    @computed_field
+    @computed_field    # type: ignore[prop-decorator]
     @property
     def is_free(self) -> bool:
         return _effective_price_cents(self.list_price_cents, self.sale_price_cents) == 0
 
-    @computed_field
+    @computed_field    # type: ignore[prop-decorator]
     @property
     def formatted_price(self) -> str:
         price = _effective_price_cents(self.list_price_cents, self.sale_price_cents)

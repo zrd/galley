@@ -273,6 +273,42 @@ class TestManuscriptService:
         slugs = {t.slug for t in manuscript.tags}
         assert slugs == {"hard-sci-fi", "adventure"}
 
+    @pytest.mark.asyncio
+    async def test_create_with_tag_names_but_no_tag_repo_raises(
+        self, db_session: Session, author_id
+    ):
+        """ManuscriptService can be constructed without a tag_repo (see the
+        API's other Depends-based construction sites); passing tag_names in
+        that case must fail loudly rather than crash on .get_or_create()."""
+        repo = ManuscriptRepository(db_session)
+        service = ManuscriptService(repo, tag_repo=None)
+        mock_storage = AsyncMock()
+        with patch("app.services.manuscript_service.get_storage_backend", return_value=mock_storage):
+            with pytest.raises(ValueError, match="tag_repo"):
+                await service.create(
+                    author_id=author_id,
+                    title="Tagged Book",
+                    source_format=SourceFormat.EPUB,
+                    filename="tagged.epub",
+                    content=b"fake content",
+                    tag_names=["Hard Sci-Fi"],
+                )
+
+    def test_update_metadata_with_tag_names_but_no_tag_repo_raises(
+        self, db_session: Session, author_id
+    ):
+        ms_repo = ManuscriptRepository(db_session)
+        manuscript = _make_manuscript(ms_repo, author_id, title="Book")
+        db_session.commit()
+
+        service = ManuscriptService(ms_repo, tag_repo=None)
+        with pytest.raises(ValueError, match="tag_repo"):
+            service.update_metadata(
+                manuscript.id,
+                author_id=author_id,
+                tag_names=["Horror"],
+            )
+
     def test_update_metadata_with_tag_names(self, service: ManuscriptService, db_session: Session, author_id):
         ms_repo = ManuscriptRepository(db_session)
         tag_repo = TagRepository(db_session)

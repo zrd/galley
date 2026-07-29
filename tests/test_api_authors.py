@@ -113,6 +113,12 @@ class TestUpdateCurrentAuthor:
         response = client.put("/authors/me", headers=auth_headers, json={"display_name": "   "})
         assert response.status_code == 422
 
+    def test_null_display_name_rejected(self, client: TestClient, auth_headers: dict):
+        """Unlike bio/website, display_name has no cleared state -- an author
+        always has one. Explicit null must be rejected, not silently accepted."""
+        response = client.put("/authors/me", headers=auth_headers, json={"display_name": None})
+        assert response.status_code == 422
+
     def test_update_requires_auth(self, client: TestClient):
         response = client.put("/authors/me", json={"display_name": "Hacker"})
         assert response.status_code == 401

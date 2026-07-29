@@ -73,13 +73,13 @@ class Ebook:
         """Increment the download counter."""
         self.download_count += 1
 
-    def publish(self):
+    def publish(self) -> None:
         self.visibility = Visibility.PUBLISHED
         if self.published_at is None:
             self.published_at = datetime.now(UTC)
 
-    def unlist(self):
+    def unlist(self) -> None:
         self.visibility = Visibility.UNLISTED
 
-    def make_private(self):
+    def make_private(self) -> None:
         self.visibility = Visibility.PRIVATE

@@ -1,7 +1,7 @@
 from .auth import LoginRequest, RefreshRequest, TokenResponse
 from .author import AuthorCreate, AuthorPublicRead, AuthorRead, AuthorUpdate
 from .ebook import EbookGenerateRequest, EbookListItem, EbookRead
-from .genre import GenreCreate, GenreListItem, GenreRead, GenreTree
+from .genre import GenreCreate, GenreListItem, GenreRead, GenreTree, StoreGenreTree
 from .manuscript import ManuscriptCreate, ManuscriptListItem, ManuscriptRead, ManuscriptUpdate
 from .sample import SampleCreate, SampleRead, SampleUpdate
 from .store import (
@@ -11,7 +11,6 @@ from .store import (
     StoreBrowseItem,
     StoreEditionDetail,
     StoreEditionSummary,
-    StoreGenreTree,
     StoreManuscriptDetail,
     StorePaginatedResponse,
 )

@@ -28,6 +28,8 @@ class AuthorUpdate(BaseModel):
     def display_name_not_whitespace(cls, v: str | None) -> str | None:
         if v is not None and not v.strip():
             raise ValueError("display_name cannot be empty or whitespace only")
+        if v is None:
+            raise ValueError("display_name cannot be null")
         return v
 
     @field_validator("website")

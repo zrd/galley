@@ -8,7 +8,7 @@ Provides:
 """
 
 from datetime import UTC, datetime, timedelta
-from typing import Annotated
+from typing import Annotated, Literal, TypedDict
 from uuid import UUID
 
 import bcrypt
@@ -20,6 +20,12 @@ from app.config import settings
 
 # JWT Bearer token security scheme
 bearer_scheme = HTTPBearer(auto_error=False)
+
+
+class TokenPayload(TypedDict):
+    sub: str
+    exp: int    # PyJWT converts to a Unix timestamp (from datetime) upon encoding
+    type: Literal["access", "refresh"]
 
 
 def hash_password(password: str) -> str:
@@ -79,7 +85,7 @@ def create_refresh_token(author_id: UUID, expires_delta: timedelta | None = None
     return jwt.encode(payload, settings.JWT_SECRET_KEY, algorithm=settings.JWT_ALGORITHM)
 
 
-def decode_token(token: str) -> dict:
+def decode_token(token: str) -> TokenPayload:
     """
     Decode and validate a JWT token.
 
@@ -93,7 +99,7 @@ def decode_token(token: str) -> dict:
         HTTPException: If the token is invalid or expired
     """
     try:
-        payload = jwt.decode(
+        payload: TokenPayload = jwt.decode(
             token, settings.JWT_SECRET_KEY, algorithms=[settings.JWT_ALGORITHM]
         )
         return payload

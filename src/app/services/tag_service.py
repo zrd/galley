@@ -23,5 +23,5 @@ class TagService:
     def list_all(self, owner_id: UUID) -> list[Tag]:
         return self.repo.list_by_owner(owner_id)
 
-    def get_by_slug(self, slug: str, owner_id: UUID):
+    def get_by_slug(self, slug: str, owner_id: UUID) -> Tag | None:
         return self.repo.get_by_slug(slug=slug, owner_id=owner_id)
