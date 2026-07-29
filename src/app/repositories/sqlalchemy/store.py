@@ -1,7 +1,8 @@
 from collections.abc import Sequence
+from typing import Any
 from uuid import UUID
 
-from sqlalchemy import case, func, select
+from sqlalchemy import ColumnElement, case, func, select
 from sqlalchemy.orm import Session, joinedload, selectinload
 
 from app.db.models import (
@@ -176,7 +177,7 @@ class StoreRepository:
             .scalar_subquery()
             .correlate(ManuscriptModel)
         )
-        ordering = {
+        ordering: dict[str, ColumnElement[Any]] = {
             "a_to_z": ManuscriptModel.title.asc(),
             "z_to_a": ManuscriptModel.title.desc(),
             "newest": first_published_at.desc(),

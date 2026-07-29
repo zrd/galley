@@ -53,10 +53,17 @@ class ManuscriptService:
             self.repo.set_genres(manuscript_id=created.id, genre_ids=genre_ids)
 
         if tag_names:
+            if self.tag_repo is None:
+                raise ValueError("tag_repo is required to set tags")
+
             tag_ids = [self.tag_repo.get_or_create(name=n, owner_id=author_id).id for n in tag_names]
             self.repo.set_tags(manuscript_id=created.id, tag_ids=tag_ids)
 
-        return self.repo.get(created.id)
+        result = self.repo.get(created.id)
+        if result is None:
+            raise ValueError(f"Manuscript {created.id} not found")
+
+        return result
 
     def get(self, manuscript_id: UUID, *, include_deleted: bool = False) -> Manuscript:
         manuscript = self.repo.get(manuscript_id, include_deleted=include_deleted)
@@ -83,10 +90,17 @@ class ManuscriptService:
             self.repo.set_genres(manuscript_id=updated.id, genre_ids=genre_ids)
 
         if tag_names is not None:
+            if self.tag_repo is None:
+                raise ValueError("tag_repo is required to set tags")
+
             tag_ids = [self.tag_repo.get_or_create(name=n, owner_id=author_id).id for n in tag_names]
             self.repo.set_tags(manuscript_id=updated.id, tag_ids=tag_ids)
 
-        return self.repo.get(updated.id)
+        result = self.repo.get(updated.id)
+        if result is None:
+            raise ValueError(f"Manuscript {updated.id} not found")
+
+        return result
 
     async def update_source(
         self,

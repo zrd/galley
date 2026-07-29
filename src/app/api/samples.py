@@ -11,8 +11,9 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from app.db import get_db
-from app.domain import ManuscriptNotFound, SampleNotFound
+from app.domain import AuthorNotFound, ManuscriptNotFound, SampleNotFound
 from app.repositories import (
+    AuthorRepository,
     EbookRepository,
     ManuscriptRepository,
     SampleRepository,
@@ -20,6 +21,7 @@ from app.repositories import (
 from app.schemas import EbookGenerateRequest, EbookRead, SampleCreate, SampleRead, SampleUpdate
 from app.security.auth import CurrentAuthorId
 from app.services import (
+    AuthorService,
     EbookService,
     GenerationError,
     GenerationService,
@@ -45,12 +47,18 @@ def get_sample_service(db: Annotated[Session, Depends(get_db)]) -> SampleService
 
 def get_ebook_service(db: Annotated[Session, Depends(get_db)]) -> EbookService:
     repo = EbookRepository(db)
-    return EbookService(repo)
+    manuscript_repo = ManuscriptRepository(db)
+    return EbookService(repo, manuscript_repo)
 
 
 def get_generation_service(db: Annotated[Session, Depends(get_db)]) -> GenerationService:
     ebook_repo = EbookRepository(db)
     return GenerationService(ebook_repo)
+
+
+def get_author_service(db: Annotated[Session, Depends(get_db)]) -> AuthorService:
+    repo = AuthorRepository(db)
+    return AuthorService(repo)
 
 
 @router.post(
@@ -193,8 +201,16 @@ async def generate_sample_ebooks(
     manuscript_service: Annotated[ManuscriptService, Depends(get_manuscript_service)],
     sample_service: Annotated[SampleService, Depends(get_sample_service)],
     generation_service: Annotated[GenerationService, Depends(get_generation_service)],
+    author_service: Annotated[AuthorService, Depends(get_author_service)],
 ) -> list[EbookRead]:
     """Generate sample ebooks in the requested formats."""
+    # Immediately raise because the current implementation generates a full
+    # copy of the ebook rather than an excerpt. Shipping this without the
+    # exception would lead an author to publish a full, free copy of their
+    # ebook when they expected a sample. The HTTPException can be removed
+    # when GenerationService.generate_sample_ebook is updated to produce a
+    # proper excerpt.
+    raise HTTPException(status_code=status.HTTP_501_NOT_IMPLEMENTED, detail="Sample generation not yet implemented")
     try:
         sample = sample_service.get(sample_id)
     except SampleNotFound:
@@ -208,6 +224,11 @@ async def generate_sample_ebooks(
     except ManuscriptNotFound:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Manuscript not found")
 
+    try:
+        author = author_service.get(author_id)
+    except AuthorNotFound:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Author not found")
+
     ebooks = []
     for output_format in generate_in.output_formats:
         try:
@@ -215,6 +236,7 @@ async def generate_sample_ebooks(
                 manuscript=manuscript,
                 sample=sample,
                 output_format=output_format,
+                author_display_name=author.display_name,
             )
             ebooks.append(ebook)
         except GenerationError as e:

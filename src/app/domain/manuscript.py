@@ -43,7 +43,7 @@ class Manuscript:
         self.state = ManuscriptState.READY
         self._touch()
 
-    def mark_draft(self):
+    def mark_draft(self) -> None:
         """Transition manuscript back to draft state, blocking download and visibility."""
         if self.state != ManuscriptState.READY:
             raise InvalidStateTransition(

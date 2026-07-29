@@ -28,6 +28,7 @@ class AuthorService:
 
     def update(self, author: Author, update_in: AuthorUpdate) -> Author:
         if "display_name" in update_in.model_fields_set:
+            assert update_in.display_name is not None, "validator rejects explicit null"
             author.display_name = update_in.display_name
 
         if "bio" in update_in.model_fields_set:
