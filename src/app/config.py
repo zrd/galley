@@ -1,3 +1,4 @@
+from typing import Literal
 from uuid import UUID
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -23,7 +24,7 @@ class Settings(BaseSettings):
     JWT_REFRESH_TOKEN_EXPIRE_DAYS: int = 7
 
     # File Storage
-    STORAGE_BACKEND: str = "local"  # "local" or "s3"
+    STORAGE_BACKEND: Literal["local", "s3"] = "local"
     LOCAL_STORAGE_PATH: str = "./storage"
     S3_BUCKET: str = ""
     S3_REGION: str = ""
