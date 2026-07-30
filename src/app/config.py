@@ -30,5 +30,11 @@ class Settings(BaseSettings):
     AWS_ACCESS_KEY_ID: str = ""
     AWS_SECRET_ACCESS_KEY: str = ""
 
+    # CORS
+    CORS_ORIGINS: list[str] = [
+        "http://localhost:5173",    # Vite dev server
+        "http://localhost:3000",    # Alternative dev port
+    ]
+
 
 settings = Settings()
