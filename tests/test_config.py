@@ -8,6 +8,7 @@ class's own defaults.
 """
 
 import pytest
+from pydantic import ValidationError
 from pydantic_settings import SettingsError
 
 from app.config import Settings
@@ -39,4 +40,28 @@ class TestCorsOrigins:
         monkeypatch.setenv("CORS_ORIGINS", "http://localhost:5173")
 
         with pytest.raises(SettingsError):
+            Settings(_env_file=None)
+
+
+class TestStorageBackend:
+    def test_accepts_local(self, monkeypatch: pytest.MonkeyPatch):
+        monkeypatch.setenv("STORAGE_BACKEND", "local")
+
+        settings = Settings(_env_file=None)
+
+        assert settings.STORAGE_BACKEND == "local"
+
+    def test_accepts_s3(self, monkeypatch: pytest.MonkeyPatch):
+        monkeypatch.setenv("STORAGE_BACKEND", "s3")
+
+        settings = Settings(_env_file=None)
+
+        assert settings.STORAGE_BACKEND == "s3"
+
+    def test_rejects_unknown_value(self, monkeypatch: pytest.MonkeyPatch):
+        """Fails fast at settings-construction time (app startup) rather
+        than lazily the first time get_storage_backend() is called."""
+        monkeypatch.setenv("STORAGE_BACKEND", "gcs")
+
+        with pytest.raises(ValidationError):
             Settings(_env_file=None)
