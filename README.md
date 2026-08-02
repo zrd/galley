@@ -23,7 +23,25 @@ graph LR
     A --> S[Local Storage<br/>./storage]
 ```
 
-The backend is a REST API with JWT auth. The frontend is a Vite/React SPA that talks to it. Storage defaults to local disk and is designed to swap to S3 without touching the domain layer.
+The backend is a REST API with JWT auth. The frontend, a Vite/React SPA, demonstrates the basic functionality with a simple GUI. Storage defaults to the local disk and is designed to swap to S3 without touching the domain layer.
+
+Internally, the backend is layered — API → Service → Domain → Repository, each with a single responsibility and no knowledge of the layers above it. See [`docs/architecture.md`](docs/architecture.md) for the full breakdown.
+
+### Publishing Lifecycle
+
+Manuscripts move through a guarded state machine that provides flexibility around a book's visibility and downloadability. Every transition is a domain method that enforces its own preconditions and raises a typed exception when violated:
+
+```mermaid
+stateDiagram-v2
+    [*] --> DRAFT
+    DRAFT --> READY: mark_ready()
+    READY --> DRAFT: mark_draft()
+    READY --> ARCHIVED: archive()
+    DRAFT --> ARCHIVED: archive()
+    ARCHIVED --> READY: unarchive()
+```
+
+Each ebook generated from a manuscript also carries its own independent visibility (`PRIVATE` / `UNLISTED` / `PUBLISHED`), gated by — but distinct from — the manuscript's state above. See [`docs/publishing_states.md`](docs/publishing_states.md) for the combined state table and the design decisions behind it (e.g. links are permanent once distributed; archiving withdraws a title from download while keeping its store listing).
 
 ### Local Setup
 

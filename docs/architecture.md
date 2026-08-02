@@ -59,14 +59,7 @@ Responsible for:
 
 Domain objects have no dependencies on the database, HTTP, or Pydantic. They can be instantiated and tested in complete isolation.
 
-Example: `Manuscript.mark_ready()` enforces that the transition only happens from `DRAFT` state, raising `InvalidStateTransition` otherwise. The service calls this method; the repository persists the result.
-
-**State machine example (Manuscript):**
-```
-DRAFT → READY → ARCHIVED
-  ↑_______|
-(unarchive goes to READY, not DRAFT)
-```
+Example: `Manuscript.mark_ready()` enforces that the transition only happens from `DRAFT` state, raising `InvalidStateTransition` otherwise. The service calls this method; the repository persists the result. See [`publishing_states.md`](publishing_states.md) for the full state machine and its interaction with ebook visibility.
 
 Methods like `mark_ready()`, `archive()`, and `unarchive()` encode valid transitions. `can_generate_ebook()` expresses a business rule as a readable predicate.
 
@@ -81,7 +74,7 @@ The repository layer has two parts:
 
 **Protocols** (`protocols.py`) define the interface each repository must satisfy, using Python's structural typing (`Protocol`). This lets the service layer depend on the interface, not the implementation — enabling in-memory fakes in tests without inheriting from a base class.
 
-**SQLAlchemy implementations** (`sqlalchemy.py`) provide the real database-backed implementations. Private mapper functions (e.g. `_manuscript_model_to_domain()`) translate ORM models to domain objects. These are intentionally not methods — they're pure functions with no side effects.
+**SQLAlchemy implementations** (`sqlalchemy/`) provide the real database-backed implementations. Private mapper functions (e.g. `_manuscript_model_to_domain()`) translate ORM models to domain objects. These are intentionally not methods — they're pure functions with no side effects.
 
 Example mapper:
 ```python
@@ -158,20 +151,6 @@ Genres are hierarchical reference data (parent → children) stored in a `genres
 
 Most entities have a `deleted_at: datetime | None` field. Soft-deleted records remain in the database but are filtered out by default. Repository methods accept `include_deleted: bool = False` to opt in to seeing them. Hard deletes exist but are rarely used.
 
-### Mutable Default Fields in Dataclasses
-
-Python shared-mutable-default gotcha: never use `= []` as a default for a list field in a dataclass. Always use `field(default_factory=list)`:
-
-```python
-# Wrong
-genres: list[Genre] = []
-
-# Correct
-genres: list[Genre] = field(default_factory=list)
-```
-
-Pydantic models don't have this problem — `= []` is safe there.
-
 ### Protocol-Based Repositories
 
 Services depend on repository protocols, not concrete implementations:
@@ -195,7 +174,7 @@ When adding a new entity (e.g. Tags in STORE-002), the typical sequence is:
 
 1. **Domain** — create the dataclass in `src/app/domain/`, export from `__init__.py`
 2. **Database** — add `*Model` to `src/app/db/models.py`; create an Alembic migration
-3. **Repository** — add protocol to `protocols.py`; implement in `sqlalchemy.py` with a mapper function; export from `__init__.py`
+3. **Repository** — add protocol to `protocols.py`; implement in `sqlalchemy/` with a mapper function; export from `__init__.py`
 4. **Schemas** — add `*Create`, `*Update`, `*Read` to `src/app/schemas/`
 5. **Service** — add or update service to orchestrate operations
 6. **API** — add route handlers; wire up dependencies

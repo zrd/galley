@@ -20,7 +20,7 @@ regardless of their individual visibility settings.
 **ARCHIVED** implements a "vault" model: the title stays visible in the public
 store as an out-of-print or temporarily unavailable listing, but customers cannot
 download it. The author can pull a title from the vault by un-archiving (restoring
-to READY) or remove it entirely by un-publishing the ebook first.
+to READY) or remove it entirely by calling `make_private()` on the ebook first.
 
 ---
 
@@ -58,16 +58,12 @@ Author-controlled per ebook. Only meaningful when the manuscript is in READY sta
 
 ### ManuscriptState
 
-```
-DRAFT ── mark_ready() ──► READY ── archive() ──► ARCHIVED
-  ▲                        │ ▲                       │
-  └───── mark_draft() ─────┘ │        unarchive() ───┘
-                             └─────────────┘
-```
-
 - `mark_draft()`: READY → DRAFT only. Raises `InvalidStateTransition` from DRAFT or ARCHIVED.
 - `mark_ready()`: DRAFT → READY only.
-- `archive()` / `unarchive()`: READY ↔ ARCHIVED.
+- `archive()`: DRAFT or READY → ARCHIVED — a manuscript can be retired before it's ever
+  finished (see the `ARCHIVED`/`PRIVATE` "manuscript retired, ebook was never released" row
+  above). Raises `InvalidStateTransition` only if already ARCHIVED.
+- `unarchive()`: ARCHIVED → READY only.
 - `update_source()`: implicitly resets to DRAFT (source change invalidates ready status).
 
 ### Ebook Visibility
@@ -92,4 +88,4 @@ corrected source and publishes it deliberately.
 
 **ARCHIVED is not the same as deleted.** Archiving withdraws a title from
 download while keeping its store presence. An author who wants to fully remove a
-title un-publishes its ebooks first, then archives the manuscript.
+title calls `make_private()` on its ebooks first, then archives the manuscript.
