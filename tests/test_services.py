@@ -12,6 +12,7 @@ from app.domain import (
     AuthorizationError,
     AuthorNotFound,
     Manuscript,
+    ManuscriptArchived,
     ManuscriptInDraft,
     ManuscriptNotFound,
     ManuscriptState,
@@ -826,6 +827,114 @@ class TestGetForDownload:
 
         with pytest.raises(ManuscriptInDraft):
             service.get_for_download(ebook.id, requester_id=owner_id)
+
+    def test_archived_manuscript_blocks_stranger(
+        self, service: EbookService, db_session: Session, manuscript_id, stranger_id
+    ):
+        ebook = self._make_ebook(service, db_session, manuscript_id)
+        ebook = service.publish(ebook.id)
+        db_session.commit()
+
+        manuscript_repo = ManuscriptRepository(db_session)
+        manuscript_service = ManuscriptService(
+            manuscript_repo, SampleRepository(db_session), EbookRepository(db_session)
+        )
+        manuscript_service.archive(manuscript_id)
+        db_session.commit()
+
+        with pytest.raises(ManuscriptArchived):
+            service.get_for_download(ebook.id, requester_id=stranger_id)
+
+    def test_archived_manuscript_blocks_anonymous(
+        self, service: EbookService, db_session: Session, manuscript_id
+    ):
+        ebook = self._make_ebook(service, db_session, manuscript_id)
+        ebook = service.publish(ebook.id)
+        db_session.commit()
+
+        manuscript_repo = ManuscriptRepository(db_session)
+        manuscript_service = ManuscriptService(
+            manuscript_repo, SampleRepository(db_session), EbookRepository(db_session)
+        )
+        manuscript_service.archive(manuscript_id)
+        db_session.commit()
+
+        with pytest.raises(ManuscriptArchived):
+            service.get_for_download(ebook.id, requester_id=None)
+
+    def test_archived_manuscript_allows_author(
+        self, service: EbookService, db_session: Session, manuscript_id, owner_id
+    ):
+        ebook = self._make_ebook(service, db_session, manuscript_id)
+        ebook = service.publish(ebook.id)
+        db_session.commit()
+
+        manuscript_repo = ManuscriptRepository(db_session)
+        manuscript_service = ManuscriptService(
+            manuscript_repo, SampleRepository(db_session), EbookRepository(db_session)
+        )
+        manuscript_service.archive(manuscript_id)
+        db_session.commit()
+
+        result = service.get_for_download(ebook.id, requester_id=owner_id)
+
+        assert result.id == ebook.id
+
+    def test_archived_manuscript_allows_author_when_unlisted(
+        self, service: EbookService, db_session: Session, manuscript_id, owner_id
+    ):
+        ebook = self._make_ebook(service, db_session, manuscript_id)
+        ebook = service.unlist(ebook.id)
+        db_session.commit()
+
+        manuscript_repo = ManuscriptRepository(db_session)
+        manuscript_service = ManuscriptService(
+            manuscript_repo, SampleRepository(db_session), EbookRepository(db_session)
+        )
+        manuscript_service.archive(manuscript_id)
+        db_session.commit()
+
+        result = service.get_for_download(ebook.id, requester_id=owner_id)
+
+        assert result.id == ebook.id
+
+    def test_archived_manuscript_blocks_stranger_when_unlisted(
+        self, service: EbookService, db_session: Session, manuscript_id, stranger_id
+    ):
+        """The ARCHIVED gate applies regardless of ebook visibility, not just PUBLISHED."""
+        ebook = self._make_ebook(service, db_session, manuscript_id)
+        ebook = service.unlist(ebook.id)
+        db_session.commit()
+
+        manuscript_repo = ManuscriptRepository(db_session)
+        manuscript_service = ManuscriptService(
+            manuscript_repo, SampleRepository(db_session), EbookRepository(db_session)
+        )
+        manuscript_service.archive(manuscript_id)
+        db_session.commit()
+
+        with pytest.raises(ManuscriptArchived):
+            service.get_for_download(ebook.id, requester_id=stranger_id)
+
+    def test_unarchiving_restores_download_for_everyone(
+        self, service: EbookService, db_session: Session, manuscript_id, stranger_id
+    ):
+        ebook = self._make_ebook(service, db_session, manuscript_id)
+        ebook = service.publish(ebook.id)
+        db_session.commit()
+
+        manuscript_repo = ManuscriptRepository(db_session)
+        manuscript_service = ManuscriptService(
+            manuscript_repo, SampleRepository(db_session), EbookRepository(db_session)
+        )
+        manuscript_service.archive(manuscript_id)
+        db_session.commit()
+        manuscript_service.unarchive(manuscript_id)
+        db_session.commit()
+
+        result = service.get_for_download(ebook.id, requester_id=stranger_id)
+
+        assert result.id == ebook.id
 
 
 class TestTagRepository:

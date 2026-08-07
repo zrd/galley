@@ -454,6 +454,40 @@ class TestDownloadEbook:
         response = client.get(f"/ebooks/{ebook_id}/download")
         assert response.status_code == 404
 
+    def test_download_archived_manuscript_blocked_for_anonymous(
+        self, client: TestClient, auth_headers: dict, ready_manuscript_id: str
+    ):
+        """An archived manuscript's ebook is not downloadable without auth."""
+        generate_response = client.post(
+            f"/ebooks/manuscripts/{ready_manuscript_id}/generate",
+            headers=auth_headers,
+            json={"output_formats": ["epub"]},
+        )
+        ebook_id = generate_response.json()[0]["id"]
+        client.post(f"/ebooks/{ebook_id}/publish", headers=auth_headers)
+        client.post(f"/manuscripts/{ready_manuscript_id}/archive", headers=auth_headers)
+
+        response = client.get(f"/ebooks/{ebook_id}/download")
+
+        assert response.status_code == 403
+
+    def test_download_archived_manuscript_allowed_for_author(
+        self, client: TestClient, auth_headers: dict, ready_manuscript_id: str
+    ):
+        """The owning author can still download their own archived ebook."""
+        generate_response = client.post(
+            f"/ebooks/manuscripts/{ready_manuscript_id}/generate",
+            headers=auth_headers,
+            json={"output_formats": ["epub"]},
+        )
+        ebook_id = generate_response.json()[0]["id"]
+        client.post(f"/ebooks/{ebook_id}/publish", headers=auth_headers)
+        client.post(f"/manuscripts/{ready_manuscript_id}/archive", headers=auth_headers)
+
+        response = client.get(f"/ebooks/{ebook_id}/download", headers=auth_headers)
+
+        assert response.status_code == 200
+
 
 class TestDeleteEbook:
     def test_delete_nonexistent_ebook(self, client: TestClient, auth_headers: dict):
