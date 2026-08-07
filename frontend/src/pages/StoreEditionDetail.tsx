@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { storeApi } from '../api/store';
@@ -12,6 +13,7 @@ function formatBytes(bytes: number): string {
 
 export function StoreEditionDetail() {
   const { id } = useParams<{ id: string }>();
+  const [downloadError, setDownloadError] = useState<string | null>(null);
 
   const { data, isLoading, error } = useQuery({
     queryKey: ['store', 'edition', id],
@@ -19,6 +21,29 @@ export function StoreEditionDetail() {
     enabled: !!id,
     retry: false,
   });
+
+  const handleDownload = async () => {
+    if (!data) return;
+    setDownloadError(null);
+    const response = await fetch(`${API_BASE_URL}${data.download_url}`, {
+      headers: { Authorization: `Bearer ${localStorage.getItem('access_token')}` },
+    });
+    if (!response.ok) {
+      const body = await response.json().catch(() => ({}));
+      setDownloadError(typeof body.detail === 'string' ? body.detail : 'Download failed');
+      return;
+    }
+    const cd = response.headers.get('Content-Disposition');
+    const match = cd?.match(/filename\*=UTF-8''([^;]+)/i) ?? cd?.match(/filename="([^"]+)"/i);
+    const filename = match ? decodeURIComponent(match[1]) : 'download';
+    const blob = await response.blob();
+    const objectUrl = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = objectUrl;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(objectUrl);
+  };
 
   if (isLoading) {
     return (
@@ -109,12 +134,15 @@ export function StoreEditionDetail() {
         </div>
 
         <div className="mt-8 border-t border-gray-100 pt-6">
-          <a
-            href={`${API_BASE_URL}${data.download_url}`}
+          <button
+            onClick={handleDownload}
             className="block w-full rounded bg-blue-600 px-6 py-3 text-center text-base font-semibold text-white hover:bg-blue-700"
           >
             Download {data.output_format.toUpperCase()}
-          </a>
+          </button>
+          {downloadError && (
+            <p className="mt-2 text-center text-sm text-red-600">{downloadError}</p>
+          )}
         </div>
       </div>
     </div>

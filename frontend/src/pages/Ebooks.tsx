@@ -334,7 +334,9 @@ export function Ebooks() {
 
   const handleDownloadEbook = async (ebookId: string) => {
     const url = ebooksApi.getDownloadUrl(ebookId);
-    const response = await fetch(url);
+    const response = await fetch(url, {
+      headers: { Authorization: `Bearer ${localStorage.getItem('access_token')}` },
+    });
     if (!response.ok) {
       setDownloadErrors((prev) => ({
         ...prev,
@@ -473,7 +475,14 @@ export function Ebooks() {
                           Unavailable in draft
                         </span>
                       ) : (
-                        <VisibilityCell ebook={ebook} />
+                        <div className="space-y-1">
+                          {manuscript?.state === 'archived' && (
+                            <span className="inline-flex items-center rounded bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600">
+                              Archived — download blocked for customers
+                            </span>
+                          )}
+                          <VisibilityCell ebook={ebook} />
+                        </div>
                       )}
                     </td>
                     <td className="px-6 py-2 align-middle">

@@ -169,7 +169,9 @@ export function ManuscriptDetail() {
 
   const handleDownloadEbook = async (ebookId: string) => {
     const url = ebooksApi.getDownloadUrl(ebookId);
-    const response = await fetch(url);
+    const response = await fetch(url, {
+      headers: { Authorization: `Bearer ${localStorage.getItem('access_token')}` },
+    });
     if (!response.ok) {
       setDownloadErrors((prev) => ({
         ...prev,
