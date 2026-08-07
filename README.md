@@ -29,17 +29,7 @@ Internally, the backend is layered — API → Service → Domain → Repository
 
 ### Publishing Lifecycle
 
-Manuscripts move through a guarded state machine that provides flexibility around a book's visibility and downloadability. Every transition is a domain method that enforces its own preconditions and raises a typed exception when violated:
-
-```mermaid
-stateDiagram-v2
-    [*] --> DRAFT
-    DRAFT --> READY: mark_ready()
-    READY --> DRAFT: mark_draft()
-    READY --> ARCHIVED: archive()
-    DRAFT --> ARCHIVED: archive()
-    ARCHIVED --> READY: unarchive()
-```
+Manuscripts move through a guarded state machine (`DRAFT` → `READY` → `ARCHIVED`, with an editing gate back to `DRAFT` and an archive/restore cycle at the end) rather than an unchecked status field. Every transition is a domain method that enforces its own preconditions and raises a typed exception when violated.
 
 Each ebook generated from a manuscript also carries its own independent visibility (`PRIVATE` / `UNLISTED` / `PUBLISHED`), gated by — but distinct from — the manuscript's state above. See [`docs/publishing_states.md`](docs/publishing_states.md) for the combined state table and the design decisions behind it (e.g. links are permanent once distributed; archiving withdraws a title from download while keeping its store listing).
 
