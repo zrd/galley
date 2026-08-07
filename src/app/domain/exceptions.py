@@ -34,6 +34,12 @@ class ManuscriptInDraft(DomainError):
     pass
 
 
+class ManuscriptArchived(DomainError):
+    """Raised when a non-author requests a download from an archived manuscript."""
+
+    pass
+
+
 class SampleNotFound(EntityNotFound):
     """Raised when a sample is not found."""
 

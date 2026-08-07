@@ -18,6 +18,7 @@ from app.domain import (
     Download,
     Ebook,
     EbookNotFound,
+    ManuscriptArchived,
     ManuscriptInDraft,
     ManuscriptNotFound,
     UnlistedDownloadLimitExceeded,
@@ -132,6 +133,8 @@ async def download_ebook(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Manuscript not found")
     except ManuscriptInDraft:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Temporarily unavailable")
+    except ManuscriptArchived:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Archived")
     except AuthorizationError:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Private edition")
     except UnlistedDownloadLimitExceeded:

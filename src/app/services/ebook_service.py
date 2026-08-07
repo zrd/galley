@@ -4,6 +4,7 @@ from app.domain import (
     AuthorizationError,
     Ebook,
     EbookNotFound,
+    ManuscriptArchived,
     ManuscriptInDraft,
     ManuscriptNotFound,
     ManuscriptState,
@@ -56,6 +57,10 @@ class EbookService:
 
         if manuscript.state == ManuscriptState.DRAFT:
             raise ManuscriptInDraft(f"Manuscript {manuscript.id} in draft state")
+
+        if manuscript.state == ManuscriptState.ARCHIVED:
+            if requester_id is None or requester_id != manuscript.author_id:
+                raise ManuscriptArchived(f"Manuscript {manuscript.id} is archived")
 
         if ebook.visibility == Visibility.PRIVATE:
             if requester_id is None or requester_id != manuscript.author_id:
