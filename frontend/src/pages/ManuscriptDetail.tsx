@@ -152,13 +152,13 @@ export function ManuscriptDetail() {
 
   const handleMarkDraft = async () => {
     if (!id) return;
-    if (!window.confirm('Revert to Draft? Ebook downloads will be temporarily unavailable until you mark it Ready again.')) return;
+    if (!window.confirm('Revert to Draft? It will disappear from store listings and downloads will be unavailable until you mark it Ready again.')) return;
     await markDraft.mutateAsync(id);
   };
 
   const handleArchive = async () => {
     if (!id) return;
-    if (!window.confirm('Archive this manuscript? It will no longer appear in active listings.')) return;
+    if (!window.confirm("Archive this manuscript? It will stay listed in the store as out-of-print — customers won't be able to download it, but you still can.")) return;
     await archiveManuscript.mutateAsync(id);
   };
 
