@@ -233,6 +233,33 @@ class TestGenreTreeAssembly:
         thriller = next(g for g in tree if g.name == "Thriller")
         assert thriller.published_count == 1
 
+    def test_draft_manuscript_excluded_from_count(self, service: StoreService, db_session: Session):
+        author = _author(db_session)
+        genre = _genre(db_session, "Horror")
+        m = _manuscript(db_session, author.id)
+        _ebook(db_session, m.id)
+        db_session.add(ManuscriptGenreModel(manuscript_id=m.id, genre_id=genre.id))
+        m.state = ManuscriptState.DRAFT
+        db_session.commit()
+
+        tree = service.list_genres_with_counts()
+        horror = next(g for g in tree if g.name == "Horror")
+        assert horror.published_count == 0
+
+    def test_archived_manuscript_still_counted(self, service: StoreService, db_session: Session):
+        """ARCHIVED manuscripts stay listed -- the 'vault' model (BUG-011/BUG-012)."""
+        author = _author(db_session)
+        genre = _genre(db_session, "Mystery")
+        m = _manuscript(db_session, author.id)
+        _ebook(db_session, m.id)
+        db_session.add(ManuscriptGenreModel(manuscript_id=m.id, genre_id=genre.id))
+        m.state = ManuscriptState.ARCHIVED
+        db_session.commit()
+
+        tree = service.list_genres_with_counts()
+        mystery = next(g for g in tree if g.name == "Mystery")
+        assert mystery.published_count == 1
+
 
 # ---------------------------------------------------------------------------
 # browse_listings — filters
@@ -359,6 +386,28 @@ class TestBrowseListingsFilters:
         _, total = repo.browse_listings(offset=0, limit=10)
         assert total == 0
 
+    def test_excludes_draft_manuscripts(self, repo: StoreRepository, db_session: Session):
+        author = _author(db_session)
+        m = _manuscript(db_session, author.id)
+        _ebook(db_session, m.id)
+        m.state = ManuscriptState.DRAFT
+        db_session.commit()
+
+        _, total = repo.browse_listings(offset=0, limit=10)
+        assert total == 0
+
+    def test_includes_archived_manuscripts(self, repo: StoreRepository, db_session: Session):
+        """ARCHIVED manuscripts stay listed -- the 'vault' model (BUG-011/BUG-012)."""
+        author = _author(db_session)
+        m = _manuscript(db_session, author.id)
+        _ebook(db_session, m.id)
+        m.state = ManuscriptState.ARCHIVED
+        db_session.commit()
+
+        results, total = repo.browse_listings(offset=0, limit=10)
+        assert total == 1
+        assert results[0].id == m.id
+
     def test_pagination_returns_correct_slice(self, repo: StoreRepository, db_session: Session):
         author = _author(db_session)
         for i in range(5):
@@ -426,6 +475,27 @@ class TestGetListing:
 
         assert repo.get_listing(m.id) is None
 
+    def test_returns_none_for_draft_manuscript(self, repo: StoreRepository, db_session: Session):
+        author = _author(db_session)
+        m = _manuscript(db_session, author.id)
+        _ebook(db_session, m.id)
+        m.state = ManuscriptState.DRAFT
+        db_session.commit()
+
+        assert repo.get_listing(m.id) is None
+
+    def test_returns_manuscript_for_archived(self, repo: StoreRepository, db_session: Session):
+        """ARCHIVED manuscripts stay listed -- the 'vault' model (BUG-011/BUG-012)."""
+        author = _author(db_session)
+        m = _manuscript(db_session, author.id)
+        _ebook(db_session, m.id)
+        m.state = ManuscriptState.ARCHIVED
+        db_session.commit()
+
+        result = repo.get_listing(m.id)
+        assert result is not None
+        assert result.id == m.id
+
     def test_editions_excludes_private_siblings(self, repo: StoreRepository, db_session: Session):
         """Private ebook on a published manuscript must not appear in the editions list."""
         author = _author(db_session)
@@ -479,6 +549,27 @@ class TestGetEdition:
         db_session.commit()
 
         assert repo.get_edition(e.id) is None
+
+    def test_returns_none_for_draft_manuscript(self, repo: StoreRepository, db_session: Session):
+        author = _author(db_session)
+        m = _manuscript(db_session, author.id)
+        e = _ebook(db_session, m.id, visibility=Visibility.PUBLISHED)
+        m.state = ManuscriptState.DRAFT
+        db_session.commit()
+
+        assert repo.get_edition(e.id) is None
+
+    def test_returns_edition_for_archived_manuscript(self, repo: StoreRepository, db_session: Session):
+        """ARCHIVED manuscripts stay listed -- the 'vault' model (BUG-011/BUG-012)."""
+        author = _author(db_session)
+        m = _manuscript(db_session, author.id)
+        e = _ebook(db_session, m.id, visibility=Visibility.PUBLISHED)
+        m.state = ManuscriptState.ARCHIVED
+        db_session.commit()
+
+        result = repo.get_edition(e.id)
+        assert result is not None
+        assert result.id == e.id
 
     def test_manuscript_ebooks_excludes_private_siblings(self, repo: StoreRepository, db_session: Session):
         """manuscript.ebooks on the returned edition should only be PUBLISHED."""
@@ -551,6 +642,28 @@ class TestGetAuthorProfile:
         result = repo.get_author_profile(author.id)
         assert result is not None
         assert len(result.manuscripts) == 0
+
+    def test_excludes_draft_manuscripts(self, repo: StoreRepository, db_session: Session):
+        author = _author(db_session, is_public=True)
+        m = _manuscript(db_session, author.id)
+        _ebook(db_session, m.id)
+        m.state = ManuscriptState.DRAFT
+        db_session.commit()
+
+        result = repo.get_author_profile(author.id)
+        assert len(result.manuscripts) == 0
+
+    def test_includes_archived_manuscripts(self, repo: StoreRepository, db_session: Session):
+        """ARCHIVED manuscripts stay listed -- the 'vault' model (BUG-011/BUG-012)."""
+        author = _author(db_session, is_public=True)
+        m = _manuscript(db_session, author.id)
+        _ebook(db_session, m.id)
+        m.state = ManuscriptState.ARCHIVED
+        db_session.commit()
+
+        result = repo.get_author_profile(author.id)
+        assert len(result.manuscripts) == 1
+        assert result.manuscripts[0].id == m.id
 
 
 # ---------------------------------------------------------------------------

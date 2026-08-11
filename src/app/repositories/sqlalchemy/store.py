@@ -3,7 +3,7 @@ from typing import Any
 from uuid import UUID
 
 from sqlalchemy import ColumnElement, case, func, select
-from sqlalchemy.orm import Session, joinedload, selectinload
+from sqlalchemy.orm import Session, contains_eager, joinedload, selectinload
 
 from app.db.models import (
     AuthorModel,
@@ -14,7 +14,7 @@ from app.db.models import (
     ManuscriptTagModel,
     TagModel,
 )
-from app.domain import Visibility
+from app.domain import ManuscriptState, Visibility
 
 
 class StoreRepository:
@@ -53,6 +53,7 @@ class StoreRepository:
             .where(
                 has_published_ebook,
                 ManuscriptModel.deleted_at.is_(None),
+                ManuscriptModel.state != ManuscriptState.DRAFT,
             )
             .options(
                 joinedload(ManuscriptModel.author),
@@ -72,6 +73,7 @@ class StoreRepository:
             .where(
                 has_published_ebook,
                 ManuscriptModel.deleted_at.is_(None),
+                ManuscriptModel.state != ManuscriptState.DRAFT,
             )
         )
         if author_ids:
@@ -205,6 +207,7 @@ class StoreRepository:
                 ManuscriptModel.id == manuscript_id,
                 has_published_ebook,
                 ManuscriptModel.deleted_at.is_(None),
+                ManuscriptModel.state != ManuscriptState.DRAFT,
             )
             .options(
                 joinedload(ManuscriptModel.author),
@@ -221,12 +224,15 @@ class StoreRepository:
     def get_edition(self, ebook_id: UUID) -> EbookModel | None:
         stmt = (
             select(EbookModel)
+            .join(EbookModel.manuscript)
             .where(
                 EbookModel.id == ebook_id,
                 EbookModel.visibility.in_([Visibility.PUBLISHED, Visibility.UNLISTED]),
                 EbookModel.deleted_at.is_(None),
+                ManuscriptModel.state != ManuscriptState.DRAFT,
+                ManuscriptModel.deleted_at.is_(None),
             ).options(
-                joinedload(EbookModel.manuscript).options(
+                contains_eager(EbookModel.manuscript).options(
                     joinedload(ManuscriptModel.author),
                     selectinload(ManuscriptModel.genres),
                     selectinload(ManuscriptModel.tags),
@@ -279,6 +285,7 @@ class StoreRepository:
             .options(
                 selectinload(AuthorModel.manuscripts.and_(
                     ManuscriptModel.deleted_at.is_(None),
+                    ManuscriptModel.state != ManuscriptState.DRAFT,
                 )).options(
                     joinedload(ManuscriptModel.author),
                     selectinload(ManuscriptModel.genres),
@@ -296,6 +303,7 @@ class StoreRepository:
         on_manuscript_filter = (
             (ManuscriptGenreModel.manuscript_id == ManuscriptModel.id)
             & (ManuscriptModel.deleted_at.is_(None))
+            & (ManuscriptModel.state != ManuscriptState.DRAFT)
         )
         on_ebook_filter = (
             (ManuscriptModel.id == EbookModel.manuscript_id)
