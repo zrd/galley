@@ -17,8 +17,8 @@ from app.api.errors import register_error_handlers
 from app.config import settings
 
 app = FastAPI(
-    title="Self-Publishing Platform",
-    description="A self-publishing platform for authors to share their work",
+    title="Galley",
+    description="A self-publishing platform for ebook authors",
     version="0.1.0",
 )
 

@@ -1,5 +1,5 @@
 """
-Pytest configuration and fixtures for testing the self-publishing platform.
+Pytest configuration and fixtures for testing Galley.
 
 Uses an in-memory SQLite database for tests to ensure test isolation
 and avoid polluting the development database.
